@@ -256,15 +256,15 @@ class DIMPLE:
         if start - self.primerBuffer < 0:
             self.seq = (
                 gene.seq[start - self.primerBuffer :]
-                + gene.seq[: end + self.primerBuffer]
+                + gene.seq[: end + self.primerBuffer + 6]
             )
         elif end + self.primerBuffer > len(gene.seq):
             self.seq = (
                 gene.seq[start - self.primerBuffer :]
-                + gene.seq[: end + self.primerBuffer - len(gene.seq)]
+                + gene.seq[: end + self.primerBuffer - len(gene.seq) + 6]
             )
         else:
-            self.seq = gene.seq[start - self.primerBuffer : end + self.primerBuffer]
+            self.seq = gene.seq[start - self.primerBuffer : end + self.primerBuffer + 6]
         # Determine Fragment Size and store beginning and end of each fragment
         num = int(
             round(((end - start) / float(DIMPLE.maxfrag)) + 0.499999999)
@@ -919,7 +919,7 @@ def generate_DMS_fragments(
         insert_list = []
         if insert:
             insert_list.append(insert)
-        if dms:
+        if dis:
             insert_list.append(DIMPLE.handle)
         if insert or dms:
             DIMPLE.maxfrag = (
@@ -1137,7 +1137,7 @@ def generate_DMS_fragments(
                         ]
                         if custom_mutations:
                             mutations_to_make = [
-                                seq3[x]
+                                seq3(x)
                                 for x in custom_mutations[
                                     positions[mut_positions.index(i)]
                                 ].split(",")
