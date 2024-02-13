@@ -10,7 +10,10 @@ from DIMPLE.DIMPLE import (
     DIMPLE,
     generate_DMS_fragments,
 )
+from DIMPLE.utilities import parse_custom_mutations
 from Bio.Seq import Seq
+import os
+import ast
 
 parser = argparse.ArgumentParser(
     description="DIMPLE: Deep Indel Missense Programmable Library Engineering"
@@ -21,7 +24,16 @@ parser.add_argument(
     required=True,
     help="Input all gene sequences including backbone in a fasta format. Place all in one fasta file. Name description can include start and end points (>gene1 start:1 end:2)",
 )
-# parser.add_argument('-handle', default='AGCGGGAGACCGGGGTCTCTGAGC', help='Genetic handle for domain insertion. This is important for defining the linker. Currently uses BsaI (4 base overhang), but this can be swapped for SapI (3 base overhang).')
+parser.add_argument(
+    "-handle",
+    default="AGCGGGAGACCGGGGTCTCTGAGC",
+    help="Genetic handle for domain insertion. This is important for defining the linker. Currently uses BsaI (4 base overhang), but this can be swapped for SapI (3 base overhang).",
+)
+parser.add_argument(
+    "-dis",
+    default=False,
+    help="use the handle to insert domains at every position in POI",
+)
 parser.add_argument(
     "-matchSequences",
     action="store_const",
@@ -47,6 +59,11 @@ parser.add_argument(
     help="Choose if you will run deep deep mutation scan",
 )
 parser.add_argument(
+    "-custom_mutations",
+    default=None,
+    help="Path to file that includes custom mutations with the format position:AA",
+)
+parser.add_argument(
     "-usage",
     default="human",
     help='Default is "human". Or select "ecoli. Or change code"',
@@ -63,7 +80,11 @@ parser.add_argument(
     nargs="+",
     help="Enter a list of deletions (number of nucleotides) to symmetrically delete (it will make deletions in multiples of 2x). Note you should enter multiples of 3 to maintain reading frame",
 )
-# parser.add_argument('-include_substitutions', default=True, help='If you are running DMS but only want to insert or delete AA')
+parser.add_argument(
+    "-include_substitutions",
+    default=False,
+    help="If you are running DMS but only want to insert or delete AA",
+)
 parser.add_argument(
     "-barcode_start",
     default=0,
@@ -94,6 +115,14 @@ parser.add_argument(
     const=True,
     action="store_const",
 )
+parser.add_argument(
+    "-make_double",
+    help="Make double mutations as well.",
+    default=False,
+    const=True,
+    action="store_const",
+)
+
 args = parser.parse_args()
 
 if args.wDir is None:
@@ -126,6 +155,8 @@ DIMPLE.barcodeR = DIMPLE.barcodeR[int(args.barcode_start) :]
 DIMPLE.cutsite = Seq(args.restriction_sequence)
 DIMPLE.avoid_sequence = [Seq(x) for x in args.avoid_sequence]
 DIMPLE.stop_codon = args.include_stop_codons
+DIMPLE.make_double = args.make_double
+
 if args.usage == "ecoli":
     DIMPLE.usage = {
         "TTT": 0.58,
@@ -261,9 +292,11 @@ elif args.usage == "human":
         "GGG": 0.25,
     }
 else:
-    DIMPLE.usage = args.usage
+    with open(args.usage) as f:
+        usage = f.readlines()
+    DIMPLE.usage = ast.literal_eval(usage.strip("\n"))
 
-OLS = addgene(args.wDir + "/" + args.geneFile)
+OLS = addgene(os.path.join(args.wDir, args.geneFile).strip())
 
 if args.matchSequences == "match":
     align_genevariation(OLS)
@@ -271,14 +304,26 @@ if args.deletions:
     args.deletions = [int(x) for x in args.deletions]
 if not any([DIMPLE.dms, args.insertions, args.deletions]):
     raise ValueError("Didn't select any mutations to generate")
+
+if args.custom_mutations:
+    # load file with custom mutations
+    with open(args.custom_mutations) as f:
+        custom_mutations = f.readlines()
+    # parse custom mutations
+    custom_mutations = parse_custom_mutations(custom_mutations)
+else:
+    custom_mutations = None
+
 generate_DMS_fragments(
     OLS,
     args.overlap,
     args.overlap,
     args.include_synonymous,
+    custom_mutations,
     DIMPLE.dms,
     args.insertions,
     args.deletions,
+    args.dis,
     args.wDir,
 )
 
