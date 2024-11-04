@@ -1,3 +1,6 @@
+# This repository contains the archived code for the published manuscript. Please use the latest version at https://github.com/coywil26/DIMPLE instead.
+
+---
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/coywil26/DIMPLE/blob/master/DIMPLE.ipynb)
 # DIMPLE: Deep Indel Missense Programmable Library Engineering
 ### Protein domain insertion via programmed oligo libraries
