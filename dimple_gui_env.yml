@@ -4,6 +4,6 @@ dependencies:
   - pip
   - pyqt5
   - pip:
-    - numpy
-    - biopython
-    - pydna
+    - numpy==1.26.4
+    - biopython==1.84
+    - pydna==5.4.0
