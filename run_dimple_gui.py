@@ -2,37 +2,41 @@
 # script for GUI
 
 from DIMPLE.DIMPLE import (
-    align_genevariation,
-    print_all,
-    post_qc,
-    addgene,
     DIMPLE,
+    addgene,
+    align_genevariation,
     generate_DMS_fragments,
+    post_qc,
+    print_all,
     switch_fragmentsize,
 )
-from DIMPLE.utilities import parse_custom_mutations, codon_usage
-from Bio.Seq import Seq
+from DIMPLE.run_settings import (
+    apply_barcode_start,
+    apply_handle,
+    apply_instance_settings,
+    apply_random_seed,
+    apply_restriction_settings,
+    compute_overlaps_and_maxfrag,
+    configure_dimple_logging,
+    DEFAULT_GUI_RANDOM_SEED,
+    normalize_avoid_list,
+    resolve_codon_usage,
+    validate_insertions,
+)
+from DIMPLE.utilities import parse_custom_mutations
+import ast
+from datetime import datetime
+from io import StringIO
+import logging
+import os
 import tkinter as tk
+import warnings
 from tkinter import filedialog
 from tkinter import messagebox
-import ast
-from io import StringIO
-import os
 
-import re
-import warnings
-
-import logging
-from datetime import datetime
-
-# Set up logging
-logger = logging.getLogger(__name__)
 log_file = "logs/DIMPLE-{:%Y-%m-%d-%s}.log".format(datetime.now())
-# If log folder does not exist, create it
-if not os.path.exists("logs"):
-    os.makedirs("logs")
-logger.basicConfig = logging.basicConfig(filename=log_file, level=logging.INFO)
-
+configure_dimple_logging(log_file)
+logger = logging.getLogger(__name__)
 logger.info("Started logging")
 
 AMINO_ACIDS = [
@@ -84,159 +88,93 @@ def run():
         app.wDir = app.geneFile.rsplit("/", 1)[0] + "/"
         app.output_text.insert(tk.END, f"Working directory set to {app.wDir}\n")
 
-    if any(
-        [x not in ["A", "C", "G", "T", "a", "c", "g", "t"] for x in app.handle.get()]
-    ):
+    try:
+        apply_handle(app.handle.get())
+    except ValueError as exc:
         app.output_text.insert(
             tk.END, "Error: Genetic handle contains non-nucleic acid bases\n"
         )
-        raise ValueError("Genetic handle contains non-nucleic acid bases")
+        raise ValueError(str(exc)) from exc
 
-    # Set up DIMPLE parameters
-    DIMPLE.synth_len = int(app.oligoLen.get())
-    overlapL = int(app.overlap.get())
-    overlapR = int(app.overlap.get())
+    deletions_for_overlap = False
     if app.delete.get():
-        overlapR = max([int(x) for x in app.deletions.get().split(",")]) + overlapR - 3
+        deletions_for_overlap = [
+            int(x) for x in app.deletions.get().split(",")
+        ]
 
-    if app.fragmentLen.get() != "auto":
-        DIMPLE.maxfrag = int(app.fragmentLen.get())
-    else:
-        DIMPLE.maxfrag = (
-            int(app.oligoLen.get()) - 64 - overlapL - overlapR
-        )  # 64 allows for cutsites and barcodes
+    frag_raw = app.fragmentLen.get()
+    fragment_len = 0 if frag_raw == "auto" else int(frag_raw)
 
-    DIMPLE.gene_primerTm = (
-        int(app.melting_temp_low.get()),
-        int(app.melting_temp_high.get()),
+    overlap_l, overlap_r = compute_overlaps_and_maxfrag(
+        int(app.oligoLen.get()),
+        fragment_len,
+        int(app.overlap.get()),
+        deletions_for_overlap,
+        logger=logger,
     )
 
-    # adjust primer primerBuffer
-    DIMPLE.primerBuffer += overlapL
+    resolve_codon_usage(app.codon_usage)
 
-    # Set up codon usage
-    if app.codon_usage == "ecoli":
-        DIMPLE.usage = codon_usage("ecoli")  # E.coli codon usage table
-    elif app.codon_usage == "human":
-        DIMPLE.usage = codon_usage("human")  #
-    else:
-        DIMPLE.usage = app.codon_usage
+    apply_barcode_start(int(app.barcode_start.get()))
 
-    # Set up barcode start
-    DIMPLE.barcodeF = DIMPLE.barcodeF[int(app.barcode_start.get()) :]
-    DIMPLE.barcodeR = DIMPLE.barcodeR[int(app.barcode_start.get()) :]
-
-    # Check whether restriction sequence specified as enzyme or sequence
-    if re.match(r"[ACGT]+\([ACGT]\)\d+/\d+", app.restriction_sequence.get()):
-        tmp_cutsite = app.restriction_sequence.get().split("(")
-        DIMPLE.cutsite = Seq(tmp_cutsite[0])
-        DIMPLE.cutsite_buffer = Seq(tmp_cutsite[1].split(")")[0])
-        tmp_overhang = tmp_cutsite[1].split(")")[1].split("/")
-        DIMPLE.cutsite_overhang = int(tmp_overhang[1]) - int(tmp_overhang[0])
-        if (
-            DIMPLE.cutsite == Seq("GGTCTC")
-            and DIMPLE.cutsite_buffer == Seq("G")
-            and DIMPLE.cutsite_overhang == 4
-        ):
-            DIMPLE.enzyme = "BsaI"
-            app.output_text.insert(tk.END, "Detected BsaI\n")
-        elif (
-            DIMPLE.cutsite == Seq("CGTCTC")
-            and DIMPLE.cutsite_buffer == Seq("G")
-            and DIMPLE.cutsite_overhang == 4
-        ):
-            DIMPLE.enzyme = "BsmBI"
-            app.output_text.insert(tk.END, "Detected BsmBI\n")
-        else:
-            DIMPLE.enzyme = None
-    elif app.restriction_sequence.get().upper() in ["BSAI", "BSMBI"]:
-        if app.restriction_sequence.get().upper() == "BSAI":
-            DIMPLE.cutsite = Seq("GGTCTC")
-            DIMPLE.cutsite_buffer = Seq("G")
-            DIMPLE.cutsite_overhang = 4
-            DIMPLE.enzyme = "BsaI"
-        else:
-            DIMPLE.cutsite = Seq("CGTCTC")
-            DIMPLE.cutsite_buffer = Seq("G")
-            DIMPLE.cutsite_overhang = 4
-            DIMPLE.enzyme = "BsmBI"
-    else:
+    try:
+        apply_restriction_settings(app.restriction_sequence.get())
+    except ValueError as exc:
         app.output_text.insert(tk.END, "Error: Restriction sequence not recognized\n")
-        raise ValueError(
-            f"Restriction sequence {app.restriction_sequence.get()} not recognized. Please check input."
-        )
-    # Print RE sequence parameters in use
+        raise ValueError(str(exc)) from exc
+
     if DIMPLE.enzyme is not None:
         app.output_text.insert(tk.END, f"Using restriction enzyme {DIMPLE.enzyme}\n")
     app.output_text.insert(tk.END, f"Using restriction sequence {DIMPLE.cutsite}\n")
 
-    # Check if sequences to avoid are specified
-    if app.avoid_sequence.get() == "":
-        DIMPLE.avoid_sequence = []
-    else:
-        DIMPLE.avoid_sequence = [Seq(x) for x in app.avoid_sequence.get().split(",")]
-    # Check whether restriction sequence is included in the avoid list
-    if DIMPLE.cutsite not in DIMPLE.avoid_sequence:
-        DIMPLE.avoid_sequence.append(DIMPLE.cutsite)
-        message = f"Restriction sequence {DIMPLE.cutsite} was not included in the avoid list. Adding before continuing."
-        warnings.warn(message)
-        logger.warning(message)
-        app.output_text.insert(tk.END, message + "\n")
+    normalize_avoid_list(app.avoid_sequence.get(), logger=logger)
 
-    # Set up substituion parameters
-    DIMPLE.aminoacids = app.substitutions.get().split(",")
     DIMPLE.stop_codon = app.stop.get()
-
-    # Set up DMS parameters
     DIMPLE.dms = app.include_substitutions.get()
     DIMPLE.make_double = app.make_double.get()
-    DIMPLE.handle = app.handle.get()
-    DIMPLE.doublefrag = app.doublefrag
     DIMPLE.maximize_nucleotide_change = app.max_mutations.get()
 
-    # Set up indel parameters
     if app.delete.get() == 0:
         deletions = False
     else:
         deletions = [int(x) for x in app.deletions.get().split(",")]
-        # Check whether deletions maintain frame
-        if any([x % 3 != 0 for x in deletions]):
-            message = "Warning: chosen deletions will not maintain reading frame. Remember that deletions are in nucleotides, not codons."
+        if any(x % 3 != 0 for x in deletions):
+            message = (
+                "Warning: chosen deletions will not maintain reading frame. Remember "
+                "that deletions are in nucleotides, not codons."
+            )
             app.output_text.insert(tk.END, message + "\n")
             warnings.warn(message)
     if app.insert.get() == 0:
         insertions = False
     else:
         insertions = app.insertions.get().split(",")
-        # Check whether insertions maintain frame
-        if any([len(x) % 3 != 0 for x in insertions]):
-            message = "Warning: chosen insertions will not maintain reading frame. Remember that insertions are in nucleotides, not codons."
+        if any(len(x) % 3 != 0 for x in insertions):
+            message = (
+                "Warning: chosen insertions will not maintain reading frame. Remember "
+                "that insertions are in nucleotides, not codons."
+            )
             app.output_text.insert(tk.END, message + "\n")
             warnings.warn(message)
-        # Check whether insertions contain non-nucleotide bases
-        for insertion in insertions:
-            if any(
-                [
-                    base not in ["A", "C", "G", "T", "a", "c", "g", "t"]
-                    for base in insertion
-                ]
-            ):
-                message = (
-                    f"Error: Insertions contain non-nucleic acid bases: {insertions}\n"
-                )
-                app.output_text.insert(tk.END, message)
-                raise ValueError("Insertions contain non-nucleic acid bases")
-        # Check whether insertions contain restriction sites
-        if any([str(DIMPLE.cutsite) in insertion for insertion in insertions]):
-            message = f"Error: Insertions contain restriction sites: {insertions}\n"
-            app.output_text.insert(tk.END, message)
-            raise ValueError("Insertions contain restriction sites")
+        try:
+            validate_insertions(insertions)
+        except ValueError as exc:
+            app.output_text.insert(tk.END, f"Error: {exc}\n")
+            raise
 
-    # Set up random seed (option not available in GUI currently)
-    DIMPLE.random_seed = 1848
+    apply_random_seed(DEFAULT_GUI_RANDOM_SEED)
 
-    # Start generating DIMPLE genes and populating OLS
     OLS = addgene(app.geneFile)
+
+    apply_instance_settings(
+        OLS,
+        aminoacids=app.substitutions.get().split(","),
+        doublefrag=app.doublefrag.get(),
+        gene_primer_tm=(
+            int(app.melting_temp_low.get()),
+            int(app.melting_temp_high.get()),
+        ),
+    )
     if app.avoid_breaksites.get():
         OLS[0].problemsites = set(int(x) for x in app.custom_mutations.keys())
         # add extras
@@ -256,8 +194,8 @@ def run():
     # Generate DMS fragments
     generate_DMS_fragments(
         OLS,
-        overlapL,
-        overlapR,
+        overlap_l,
+        overlap_r,
         app.synonymous.get(),
         app.custom_mutations,
         app.include_substitutions.get(),

@@ -73,7 +73,7 @@ class DIMPLE:
     # Calculate and update maxfrag - Max number of nucleotides that a fragment can carry
     @property
     def synth_len(self):
-        return self.__breaksites
+        return self._synth_len
 
     @synth_len.setter
     def synth_len(self, value):
@@ -96,6 +96,8 @@ class DIMPLE:
     allhangR = []
     primerTm = (56.5, 60)  # Melting temperature limits for primers
     gene_primerTm = (58, 62)  # Help gene primer amplification
+    # BsaI / BsmBI / None; set by run_settings or callers before pipeline
+    enzyme = None
     # Load Barcodes
     dataDirectory = os.path.abspath(os.path.dirname(__file__))
     try:
