@@ -42,6 +42,28 @@ class TestUtilities(unittest.TestCase):
         self.assertEqual(start, 0)
         self.assertEqual(end, 303)
 
+    def test_find_orf_non_interactive_single_candidate(self) -> None:
+        gene = SeqRecord(
+            Seq("ATG" + "GCC" * 100 + "TAA"),
+            id="orf_gene_single",
+            name="orf_gene_single",
+            description="orf_gene_single",
+        )
+        start, end = findORF(gene, non_interactive=True)
+        self.assertEqual(start, 0)
+        self.assertEqual(end, 303)
+
+    def test_find_orf_non_interactive_requires_explicit_index_when_ambiguous(self) -> None:
+        gene = SeqRecord(
+            Seq("ATG" + "GCC" * 101 + "TAA" + "ATG" + "GCC" * 101 + "TAA"),
+            id="orf_gene_multi",
+            name="orf_gene_multi",
+            description="orf_gene_multi",
+        )
+        with self.assertRaises(ValueError) as ctx:
+            findORF(gene, non_interactive=True)
+        self.assertIn("multiple orf candidates", str(ctx.exception).lower())
+
 
 if __name__ == "__main__":
     unittest.main()

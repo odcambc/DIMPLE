@@ -13,14 +13,18 @@ from Bio.Seq import Seq
 
 from DIMPLE.DIMPLE import DIMPLE
 from DIMPLE.run_settings import (
+    DimpleRuntimeConfig,
     PRIMER_BUFFER_BASE,
     apply_barcode_start,
     apply_instance_settings,
     apply_random_seed,
     apply_restriction_settings,
+    apply_runtime_policies,
     compute_overlaps_and_maxfrag,
     configure_dimple_logging,
+    get_runtime_config,
     normalize_avoid_list,
+    reset_runtime_config,
     resolve_codon_usage,
     validate_handle,
     validate_insertions,
@@ -51,11 +55,15 @@ class _FakeGene:
 
 class TestRunSettings(unittest.TestCase):
     def setUp(self) -> None:
+        reset_runtime_config()
         _reload_barcodes()
         DIMPLE.primerBuffer = PRIMER_BUFFER_BASE
         DIMPLE.enzyme = None
         DIMPLE.random_seed = 0
         DIMPLE.gene_primerTm = (58, 62)
+        DIMPLE.non_interactive = False
+        DIMPLE.breaksite_change_policy = "prompt"
+        DIMPLE.dms = False
 
     def test_validate_handle_accepts_acgt(self) -> None:
         validate_handle("ACGTacgt")
@@ -165,6 +173,33 @@ class TestRunSettings(unittest.TestCase):
         apply_random_seed(None)
         self.assertIsNone(DIMPLE.random_seed)
 
+    def test_get_runtime_config_reflects_current_class_state(self) -> None:
+        DIMPLE.non_interactive = True
+        DIMPLE.link_policy = "never"
+        cfg = get_runtime_config()
+        self.assertIsInstance(cfg, DimpleRuntimeConfig)
+        self.assertEqual(cfg.non_interactive, DIMPLE.non_interactive)
+        self.assertEqual(cfg.link_policy, DIMPLE.link_policy)
+
+    def test_apply_runtime_policies_dual_write(self) -> None:
+        cfg = get_runtime_config()
+        apply_runtime_policies(
+            dms=True,
+            stop_codon=True,
+            make_double=False,
+            maximize_nucleotide_change=True,
+            non_interactive=True,
+            preferred_orf_index=2,
+            link_policy="never",
+            breaksite_change_policy="warn",
+            config=cfg,
+        )
+        self.assertTrue(DIMPLE.dms)
+        self.assertTrue(DIMPLE.non_interactive)
+        self.assertEqual(DIMPLE.preferred_orf_index, 2)
+        self.assertEqual(DIMPLE.link_policy, "never")
+        self.assertEqual(DIMPLE.breaksite_change_policy, "warn")
+
     def test_validate_insertions_ok(self) -> None:
         apply_restriction_settings("CGTCTC(G)1/5")
         validate_insertions(["GAC", "GGGCCC"])
@@ -207,6 +242,24 @@ class TestRunSettings(unittest.TestCase):
             logger = logging.getLogger("tests.configure_dimple_logging")
             logger.info("test")
             self.assertGreater(os.path.getsize(log_path), 0)
+
+    def test_breaksites_non_interactive_error_policy_raises(self) -> None:
+        gene = DIMPLE.__new__(DIMPLE)
+        gene.geneid = "dummy"
+        gene._DIMPLE__breaksites = [30, 60, 90]
+        DIMPLE.non_interactive = True
+        DIMPLE.breaksite_change_policy = "error"
+        with self.assertRaises(ValueError):
+            gene.breaksites = [33, 60, 90]
+
+    def test_breaksites_non_interactive_warn_policy_allows(self) -> None:
+        gene = DIMPLE.__new__(DIMPLE)
+        gene.geneid = "dummy"
+        gene._DIMPLE__breaksites = [30, 60, 90]
+        DIMPLE.non_interactive = True
+        DIMPLE.breaksite_change_policy = "warn"
+        gene.breaksites = [33, 60, 90]
+        self.assertEqual(gene.breaksites, [33, 60, 90])
 
 
 if __name__ == "__main__":

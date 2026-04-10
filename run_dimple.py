@@ -21,9 +21,11 @@ from DIMPLE.run_settings import (
     apply_handle,
     apply_instance_settings,
     apply_random_seed,
+    apply_runtime_policies,
     apply_restriction_settings,
     compute_overlaps_and_maxfrag,
     configure_dimple_logging,
+    get_runtime_config,
     normalize_avoid_list,
     resolve_codon_usage,
     validate_insertions,
@@ -197,6 +199,29 @@ parser.add_argument(
     help="Seed for random number generation",
     default=None,
 )
+parser.add_argument(
+    "--non_interactive",
+    action="store_true",
+    help="Run without interactive prompts (fail fast on ambiguous ORF selection).",
+)
+parser.add_argument(
+    "--orf_index",
+    type=int,
+    default=None,
+    help="Preferred ORF index for non-interactive ORF selection.",
+)
+parser.add_argument(
+    "--link_policy",
+    choices=["prompt", "always", "never"],
+    default="prompt",
+    help="Policy for linking matched genes during align_genevariation.",
+)
+parser.add_argument(
+    "--breaksite_change_policy",
+    choices=["prompt", "warn", "error"],
+    default="prompt",
+    help="Policy when breaksite endpoints change outside DMS mode.",
+)
 args = parser.parse_args()
 
 if args.wDir is None:
@@ -206,7 +231,9 @@ if args.wDir is None:
     else:
         args.wDir = ""
 
-apply_handle(args.handle)
+runtime_config = get_runtime_config()
+
+apply_handle(args.handle, config=runtime_config)
 
 deletions_for_overlap = args.deletions if args.deletions else False
 overlap_l, overlap_r = compute_overlaps_and_maxfrag(
@@ -215,18 +242,29 @@ overlap_l, overlap_r = compute_overlaps_and_maxfrag(
     args.overlap,
     deletions_for_overlap,
     logger=logger,
+    config=runtime_config,
 )
 
-apply_barcode_start(int(args.barcode_start))
+apply_barcode_start(int(args.barcode_start), config=runtime_config)
 
-apply_restriction_settings(args.restriction_sequence)
+apply_restriction_settings(args.restriction_sequence, config=runtime_config)
 
-normalize_avoid_list(args.avoid_sequence, logger=logger)
+normalize_avoid_list(args.avoid_sequence, logger=logger, config=runtime_config)
 
-DIMPLE.dms = args.DMS
-DIMPLE.stop_codon = args.include_stop_codons
-DIMPLE.make_double = args.make_double
-DIMPLE.maximize_nucleotide_change = args.maximize_nucleotide_change
+link_policy = (
+    "never" if args.non_interactive and args.link_policy == "prompt" else args.link_policy
+)
+apply_runtime_policies(
+    dms=args.DMS,
+    stop_codon=args.include_stop_codons,
+    make_double=args.make_double,
+    maximize_nucleotide_change=args.maximize_nucleotide_change,
+    non_interactive=args.non_interactive,
+    preferred_orf_index=args.orf_index,
+    link_policy=link_policy,
+    breaksite_change_policy=args.breaksite_change_policy,
+    config=runtime_config,
+)
 
 if args.custom_mutations:
     with open(args.custom_mutations, encoding="utf-8") as f:
@@ -236,15 +274,15 @@ else:
     custom_mutations = None
 
 if args.seed:
-    apply_random_seed(int(args.seed))
+    apply_random_seed(int(args.seed), config=runtime_config)
 else:
-    apply_random_seed(None)
+    apply_random_seed(None, config=runtime_config)
 
-resolve_codon_usage(args.usage)
+resolve_codon_usage(args.usage, config=runtime_config)
 
 OLS = addgene(os.path.join(args.wDir, args.geneFile).strip())
 
-apply_instance_settings(OLS)
+apply_instance_settings(OLS, config=runtime_config)
 
 if args.matchSequences == "match":
     align_genevariation(OLS)
@@ -269,9 +307,10 @@ generate_DMS_fragments(
     args.deletions,
     args.dis,
     args.wDir,
+    config=runtime_config,
 )
 
-post_qc(OLS)
-print_all(OLS, args.wDir)
+post_qc(OLS, config=runtime_config)
+print_all(OLS, args.wDir, config=runtime_config)
 
 logger.info("Finished")

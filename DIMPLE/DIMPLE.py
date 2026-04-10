@@ -81,6 +81,10 @@ class DIMPLE:
         self.maxfrag = value - self.maxfrag_offset
 
     random_seed = 0
+    non_interactive = False
+    preferred_orf_index = None
+    link_policy = "prompt"  # prompt|always|never
+    breaksite_change_policy = "prompt"  # prompt|warn|error
 
     # Shared variables for all genes
     # Number of nucleotides in synthesis length to preserve for cutsites and primers. Cutsites are
@@ -214,7 +218,11 @@ class DIMPLE:
                 end = None
         if start is None or end is None:
             logger.info("Start and end of ORF were not provided. Manually identifying ORF.")
-            start, end = findORF(gene)
+            start, end = findORF(
+                gene,
+                non_interactive=DIMPLE.non_interactive,
+                preferred_orf_index=DIMPLE.preferred_orf_index,
+            )
             logger.info("Found the following positions: Start: " + str(start) + " End: " + str(end))
 
         self.aacount = int((end - start) / 3)
@@ -311,13 +319,23 @@ class DIMPLE:
             if (
                 value[0] != self.breaksites[0] or value[-1] != self.breaksites[-1]
             ) and not DIMPLE.dms:
-                if (
-                    input(
-                        "Beginning and End of gene have changed. Are you sure you want to continue? (y/n)"
+                if DIMPLE.non_interactive:
+                    if DIMPLE.breaksite_change_policy == "error":
+                        raise ValueError(
+                            "Beginning and end of gene changed during non-interactive run. "
+                            "Set breaksite_change_policy to 'warn' to continue."
+                        )
+                    logger.warning(
+                        "Beginning and end of gene changed in non-interactive mode; continuing."
                     )
-                    != "y"
-                ):
-                    raise Exception("Canceled user set break sites")
+                else:
+                    if (
+                        input(
+                            "Beginning and End of gene have changed. Are you sure you want to continue? (y/n)"
+                        )
+                        != "y"
+                    ):
+                        raise Exception("Canceled user set break sites")
             self.__breaksites = value
             fragsize = [j - i for i, j in zip(value[:-1], value[1:])]
             self.fragsize = fragsize
@@ -337,6 +355,13 @@ class DIMPLE:
 def align_genevariation(OLS):
     if not isinstance(OLS[0], DIMPLE):
         raise TypeError("Not an instance of the DIMPLE class")
+    def should_link_genes() -> bool:
+        if DIMPLE.link_policy == "always":
+            return True
+        if DIMPLE.link_policy == "never" or DIMPLE.non_interactive:
+            return False
+        return input("Are these genes linked? (y/n):") == "y"
+
     match = []
     aligner = Align.PairwiseAligner()
     aligner.mode = "global"
@@ -361,13 +386,13 @@ def align_genevariation(OLS):
                 if not index:  # Create a new set if not
                     print(OLS[m].geneid)
                     print(OLS[p].geneid)
-                    if input("Are these genes linked? (y/n):") == "y":
+                    if should_link_genes():
                         match.append(set([m, p]))
                 else:
                     if p not in match[index[0]] or m not in match[index[0]]:
                         for items in match[index[0]].union(set([p, m])):
                             print(OLS[items].geneid)
-                        if input("Are these genes linked? (y/n):") == "y":
+                        if should_link_genes():
                             match[index[0]].add(p)
                             match[index[0]].add(m)
     # Create fragments for each match
@@ -902,7 +927,17 @@ def check_overhangs(gene, OLS, overlapL, overlapR):
 
 
 def generate_DMS_fragments(
-    OLS, overlapL, overlapR, synonymous, custom_mutations, dms=True, insert=False, delete=False, dis=False, folder=""
+    OLS,
+    overlapL,
+    overlapR,
+    synonymous,
+    custom_mutations,
+    dms=True,
+    insert=False,
+    delete=False,
+    dis=False,
+    folder="",
+    config=None,
 ):
     """Generates the mutagenic oligos and writes the output to files."""
 
@@ -923,6 +958,21 @@ def generate_DMS_fragments(
     # dms set to true for subsitition mutations
     # insert set to a list of insertions
     # delete set to a list of numbers of symmetrical deletions
+    if config is not None:
+        DIMPLE.dms = getattr(config, "dms", DIMPLE.dms)
+        DIMPLE.stop_codon = getattr(config, "stop_codon", DIMPLE.stop_codon)
+        DIMPLE.make_double = getattr(config, "make_double", DIMPLE.make_double)
+        DIMPLE.maximize_nucleotide_change = getattr(
+            config, "maximize_nucleotide_change", DIMPLE.maximize_nucleotide_change
+        )
+        DIMPLE.non_interactive = getattr(config, "non_interactive", DIMPLE.non_interactive)
+        DIMPLE.preferred_orf_index = getattr(
+            config, "preferred_orf_index", DIMPLE.preferred_orf_index
+        )
+        DIMPLE.link_policy = getattr(config, "link_policy", DIMPLE.link_policy)
+        DIMPLE.breaksite_change_policy = getattr(
+            config, "breaksite_change_policy", DIMPLE.breaksite_change_policy
+        )
     if not isinstance(OLS[0], DIMPLE):
         raise TypeError("Not an instance of the DIMPLE class")
     # Loop through each gene or gene variation
@@ -2046,7 +2096,7 @@ def combine_fragments(tandem, num_frag_per_oligo, split):
     return tandem_seq
 
 
-def print_all(OLS, folder=""):
+def print_all(OLS, folder="", config=None):
     """Writes oligos and primers to files."""
     if not isinstance(OLS[0], DIMPLE):
         raise TypeError("Not an instance of the DIMPLE class")
@@ -2068,7 +2118,9 @@ def print_all(OLS, folder=""):
     )
 
 
-def post_qc(OLS):
+def post_qc(OLS, config=None):
+    if config is not None:
+        DIMPLE.enzyme = getattr(config, "enzyme", DIMPLE.enzyme)
     logger.info("Running post QC")
     if not isinstance(OLS[0], DIMPLE):
         raise TypeError("Not an instance of the DIMPLE class")
@@ -2204,8 +2256,11 @@ def post_qc(OLS):
     else:
         print("No non-specific primers detected")
 
-def test_final_assembly(gene):
+def test_final_assembly(gene, config=None):
     """Test that each oligo assembles properly and contains the designed mutation."""
+
+    if config is not None:
+        DIMPLE.enzyme = getattr(config, "enzyme", DIMPLE.enzyme)
 
     # Check whether the enzyme is set.
     if DIMPLE.enzyme:
@@ -2266,3 +2321,31 @@ def test_final_assembly(gene):
         except TypeError as error:
             logger.error(f"Oligo does not assemble with template: {variant}")
             logger.error(str(error))
+
+
+# Incremental module decomposition: keep legacy implementations available while
+# routing public symbols through focused modules.
+_legacy_find_geneprimer = find_geneprimer
+_legacy_find_fragment_primer = find_fragment_primer
+_legacy_check_nonspecific = check_nonspecific
+_legacy_recalculate_num_fragments = recalculate_num_fragments
+_legacy_switch_fragmentsize = switch_fragmentsize
+_legacy_check_overhangs = check_overhangs
+_legacy_combine_fragments = combine_fragments
+_legacy_print_all = print_all
+_legacy_post_qc = post_qc
+_legacy_test_final_assembly = test_final_assembly
+
+from DIMPLE.fragment_layout import (  # noqa: E402
+    check_overhangs,
+    recalculate_num_fragments,
+    switch_fragmentsize,
+)
+from DIMPLE.oligo_assembly import combine_fragments  # noqa: E402
+from DIMPLE.outputs import print_all  # noqa: E402
+from DIMPLE.primers import (  # noqa: E402
+    check_nonspecific,
+    find_fragment_primer,
+    find_geneprimer,
+)
+from DIMPLE.qc import post_qc, test_final_assembly  # noqa: E402

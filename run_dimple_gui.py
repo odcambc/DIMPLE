@@ -15,10 +15,12 @@ from DIMPLE.run_settings import (
     apply_handle,
     apply_instance_settings,
     apply_random_seed,
+    apply_runtime_policies,
     apply_restriction_settings,
     compute_overlaps_and_maxfrag,
     configure_dimple_logging,
     DEFAULT_GUI_RANDOM_SEED,
+    get_runtime_config,
     normalize_avoid_list,
     resolve_codon_usage,
     validate_insertions,
@@ -64,6 +66,7 @@ AMINO_ACIDS = [
 
 
 def run():
+    runtime_config = get_runtime_config()
     # Check that a mutation type is selected
     if not any(
         [
@@ -89,7 +92,7 @@ def run():
         app.output_text.insert(tk.END, f"Working directory set to {app.wDir}\n")
 
     try:
-        apply_handle(app.handle.get())
+        apply_handle(app.handle.get(), config=runtime_config)
     except ValueError as exc:
         app.output_text.insert(
             tk.END, "Error: Genetic handle contains non-nucleic acid bases\n"
@@ -111,14 +114,15 @@ def run():
         int(app.overlap.get()),
         deletions_for_overlap,
         logger=logger,
+        config=runtime_config,
     )
 
-    resolve_codon_usage(app.codon_usage)
+    resolve_codon_usage(app.codon_usage, config=runtime_config)
 
-    apply_barcode_start(int(app.barcode_start.get()))
+    apply_barcode_start(int(app.barcode_start.get()), config=runtime_config)
 
     try:
-        apply_restriction_settings(app.restriction_sequence.get())
+        apply_restriction_settings(app.restriction_sequence.get(), config=runtime_config)
     except ValueError as exc:
         app.output_text.insert(tk.END, "Error: Restriction sequence not recognized\n")
         raise ValueError(str(exc)) from exc
@@ -127,12 +131,18 @@ def run():
         app.output_text.insert(tk.END, f"Using restriction enzyme {DIMPLE.enzyme}\n")
     app.output_text.insert(tk.END, f"Using restriction sequence {DIMPLE.cutsite}\n")
 
-    normalize_avoid_list(app.avoid_sequence.get(), logger=logger)
-
-    DIMPLE.stop_codon = app.stop.get()
-    DIMPLE.dms = app.include_substitutions.get()
-    DIMPLE.make_double = app.make_double.get()
-    DIMPLE.maximize_nucleotide_change = app.max_mutations.get()
+    normalize_avoid_list(app.avoid_sequence.get(), logger=logger, config=runtime_config)
+    apply_runtime_policies(
+        dms=bool(app.include_substitutions.get()),
+        stop_codon=bool(app.stop.get()),
+        make_double=bool(app.make_double.get()),
+        maximize_nucleotide_change=bool(app.max_mutations.get()),
+        non_interactive=False,
+        preferred_orf_index=None,
+        link_policy="prompt",
+        breaksite_change_policy="prompt",
+        config=runtime_config,
+    )
 
     if app.delete.get() == 0:
         deletions = False
@@ -162,7 +172,7 @@ def run():
             app.output_text.insert(tk.END, f"Error: {exc}\n")
             raise
 
-    apply_random_seed(DEFAULT_GUI_RANDOM_SEED)
+    apply_random_seed(DEFAULT_GUI_RANDOM_SEED, config=runtime_config)
 
     OLS = addgene(app.geneFile)
 
@@ -174,6 +184,7 @@ def run():
             int(app.melting_temp_low.get()),
             int(app.melting_temp_high.get()),
         ),
+        config=runtime_config,
     )
     if app.avoid_breaksites.get():
         OLS[0].problemsites = set(int(x) for x in app.custom_mutations.keys())
@@ -203,12 +214,13 @@ def run():
         deletions,
         app.dis.get(),
         app.wDir,
+        config=runtime_config,
     )
 
     # Post QC checks and saving
     app.output_text.insert(tk.END, "Post QC checks and saving\n")
-    post_qc(OLS)
-    print_all(OLS, app.wDir)
+    post_qc(OLS, config=runtime_config)
+    print_all(OLS, app.wDir, config=runtime_config)
 
     logger.info("Finished")
     app.output_text.insert(tk.END, "Finished\n")
