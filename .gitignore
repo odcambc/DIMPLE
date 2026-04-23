@@ -32,3 +32,8 @@ ipython_config.py
 .DS_Store
 
 *.log
+
+# Virtual environments
+.venv/
+venv/
+env/

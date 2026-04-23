@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "DIMPLE"
+version = "0.0.0"
+description = "Deep Indel Missense Programmable Library Engineering"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.12"
+dependencies = [
+    "biopython",
+    "numpy",
+    "pydna",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+]
+
+[tool.setuptools]
+packages = ["DIMPLE"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+DIMPLE = ["data/*"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+markers = [
+    "slow: regression/integration tests that take >5s",
+    "interactive: tests that monkeypatch builtins.input",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:Bio.*",
+    "ignore::DeprecationWarning:pydna.*",
+    "ignore:Unwanted restriction site found:UserWarning",
+]
+
+[tool.coverage.run]
+source = ["DIMPLE"]
+omit = ["DIMPLE/data/*", "run_dimple_gui.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+]
