@@ -35,7 +35,7 @@ from DIMPLE.utilities import codon_usage
 def _reload_barcodes() -> None:
     """Restore barcode lists from packaged data (tests may slice them)."""
     data_dir = os.path.join(
-        os.path.dirname(__file__), "..", "DIMPLE", "data"
+        os.path.dirname(__file__), "..", "..", "DIMPLE", "data"
     )
     fwd = os.path.join(data_dir, "forward_finalprimers.fasta")
     rev = os.path.join(data_dir, "reverse_finalprimers.fasta")
