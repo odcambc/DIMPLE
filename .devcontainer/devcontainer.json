@@ -1,21 +1,22 @@
 {
-  "name": "DIMPLE",
+  "name": "DIMPLE Python 3.12",
   "image": "mcr.microsoft.com/devcontainers/python:3.12-bookworm",
-  "postCreateCommand": "python -m venv .venv && .venv/bin/pip install --upgrade pip && .venv/bin/pip install -r requirements.txt",
-  "remoteEnv": {
-    "PYTHONPATH": "${containerWorkspaceFolder}"
-  },
+  "postCreateCommand": "pip install --upgrade pip && pip install -e '.[dev]'",
   "customizations": {
     "vscode": {
       "extensions": [
         "ms-python.python",
-        "ms-python.vscode-pylance"
+        "ms-python.vscode-pylance",
+        "ms-toolsai.jupyter"
       ],
       "settings": {
-        "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python",
-        "python.terminal.activateEnvironment": true,
-        "python.analysis.extraPaths": ["${containerWorkspaceFolder}"]
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": ["tests"]
       }
     }
-  }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {}
+  },
+  "remoteUser": "vscode"
 }
