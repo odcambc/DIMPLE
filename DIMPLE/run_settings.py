@@ -149,7 +149,7 @@ def configure_dimple_logging(log_file: str, level: int = logging.INFO) -> loggin
     log_dir = os.path.dirname(os.path.abspath(log_file))
     if log_dir and not os.path.exists(log_dir):
         os.makedirs(log_dir)
-    logging.basicConfig(filename=log_file, level=level)
+    logging.basicConfig(filename=log_file, level=level, force=True)
     return logging.getLogger(__name__)
 
 

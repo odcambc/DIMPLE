@@ -10,7 +10,7 @@ def post_qc(ols, config=None):
     return _legacy_post_qc(ols, config=config)
 
 
-def test_final_assembly(gene, config=None):
+def check_final_assembly(gene, config=None):
     """Compatibility wrapper for assembly simulation QC."""
     from DIMPLE.DIMPLE import _legacy_test_final_assembly
 

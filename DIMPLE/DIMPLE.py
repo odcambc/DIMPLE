@@ -2137,7 +2137,7 @@ def post_qc(OLS, config=None):
 
         if DIMPLE.enzyme is not None:
             logger.info(f"Checking oligo assembly for {obj.geneid}")
-            test_final_assembly(obj)
+            check_final_assembly(obj)
         else:
             logger.info(f"Skipping oligo assembly check for {obj.geneid} as no enzyme is specified.")
 
@@ -2256,7 +2256,7 @@ def post_qc(OLS, config=None):
     else:
         print("No non-specific primers detected")
 
-def test_final_assembly(gene, config=None):
+def check_final_assembly(gene, config=None):
     """Test that each oligo assembles properly and contains the designed mutation."""
 
     if config is not None:
@@ -2269,10 +2269,10 @@ def test_final_assembly(gene, config=None):
         elif DIMPLE.enzyme == "BsaI":
             enzyme = BsaI
         else:
-            logger.warn("Enzyme not recognized. Not performing assembly check.")
+            logger.warning("Enzyme not recognized. Not performing assembly check.")
             return None
     else:
-        logger.warn("No enzyme set. Not performing assembly check.")
+        logger.warning("No enzyme set. Not performing assembly check.")
         return None
 
     n_fragments = len(gene.genePrimer) // 2
@@ -2334,7 +2334,7 @@ _legacy_check_overhangs = check_overhangs
 _legacy_combine_fragments = combine_fragments
 _legacy_print_all = print_all
 _legacy_post_qc = post_qc
-_legacy_test_final_assembly = test_final_assembly
+_legacy_test_final_assembly = check_final_assembly
 
 from DIMPLE.fragment_layout import (  # noqa: E402
     check_overhangs,
@@ -2348,4 +2348,4 @@ from DIMPLE.primers import (  # noqa: E402
     find_fragment_primer,
     find_geneprimer,
 )
-from DIMPLE.qc import post_qc, test_final_assembly  # noqa: E402
+from DIMPLE.qc import post_qc, check_final_assembly  # noqa: E402

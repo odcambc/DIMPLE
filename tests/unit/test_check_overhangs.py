@@ -37,14 +37,14 @@ class TestCheckOverhangsUnique:
         gene, OLS = _make_gene(tmp_path, dimple_state)
         # Override seq with a varied pattern so the F/R overhang slices differ.
         gene.seq = Seq("ATCG" * 50)
-        switched = check_overhangs(gene, OLS, overlapL=3, overlapR=3)
+        switched = check_overhangs(gene, OLS, overlap_l=3, overlap_r=3)
         assert switched is False
 
     def test_type_error_on_non_dimple(self, tmp_path, dimple_state):
         """Passing a non-DIMPLE object raises TypeError."""
         _setup_state(dimple_state)
         with pytest.raises(TypeError):
-            check_overhangs(object(), [], overlapL=3, overlapR=3)
+            check_overhangs(object(), [], overlap_l=3, overlap_r=3)
 
 
 class TestCheckOverhangsPalindrome:
@@ -55,5 +55,5 @@ class TestCheckOverhangsPalindrome:
         # Use a repeated pattern to make every 4-mer the same ("AAAA").
         gene.seq = Seq("A" * 200)
         # switch_fragmentsize will run; we only assert that switched is True.
-        switched = check_overhangs(gene, OLS, overlapL=3, overlapR=3)
+        switched = check_overhangs(gene, OLS, overlap_l=3, overlap_r=3)
         assert switched is True

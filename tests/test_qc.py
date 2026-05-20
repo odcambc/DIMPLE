@@ -8,7 +8,7 @@ from unittest.mock import patch
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
-from DIMPLE.DIMPLE import DIMPLE, post_qc, test_final_assembly
+from DIMPLE.DIMPLE import DIMPLE, post_qc, check_final_assembly
 
 
 class TestQCPaths(unittest.TestCase):
@@ -26,24 +26,24 @@ class TestQCPaths(unittest.TestCase):
 
     def test_post_qc_calls_assembly_check_when_enzyme_is_set(self) -> None:
         DIMPLE.enzyme = "BsaI"
-        with patch("DIMPLE.DIMPLE.test_final_assembly") as mocked:
+        with patch("DIMPLE.DIMPLE.check_final_assembly") as mocked:
             post_qc([self.gene])
         mocked.assert_called_once_with(self.gene)
 
     def test_post_qc_skips_assembly_check_when_enzyme_is_none(self) -> None:
         DIMPLE.enzyme = None
-        with patch("DIMPLE.DIMPLE.test_final_assembly") as mocked:
+        with patch("DIMPLE.DIMPLE.check_final_assembly") as mocked:
             post_qc([self.gene])
         mocked.assert_not_called()
 
-    def test_test_final_assembly_returns_none_when_enzyme_missing(self) -> None:
+    def test_check_final_assembly_returns_none_when_enzyme_missing(self) -> None:
         DIMPLE.enzyme = None
-        result = test_final_assembly(object())
+        result = check_final_assembly(object())
         self.assertIsNone(result)
 
-    def test_test_final_assembly_returns_none_for_unknown_enzyme(self) -> None:
+    def test_check_final_assembly_returns_none_for_unknown_enzyme(self) -> None:
         DIMPLE.enzyme = "UnknownEnzyme"
-        result = test_final_assembly(object())
+        result = check_final_assembly(object())
         self.assertIsNone(result)
 
 
