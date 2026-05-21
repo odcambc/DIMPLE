@@ -26,13 +26,13 @@ class TestQCPaths(unittest.TestCase):
 
     def test_post_qc_calls_assembly_check_when_enzyme_is_set(self) -> None:
         DIMPLE.enzyme = "BsaI"
-        with patch("DIMPLE.DIMPLE.check_final_assembly") as mocked:
+        with patch("DIMPLE.qc.check_final_assembly") as mocked:
             post_qc([self.gene])
         mocked.assert_called_once_with(self.gene)
 
     def test_post_qc_skips_assembly_check_when_enzyme_is_none(self) -> None:
         DIMPLE.enzyme = None
-        with patch("DIMPLE.DIMPLE.check_final_assembly") as mocked:
+        with patch("DIMPLE.qc.check_final_assembly") as mocked:
             post_qc([self.gene])
         mocked.assert_not_called()
 

@@ -1,10 +1,35 @@
-"""Output aggregation helpers for DIMPLE pipeline."""
+"""Output aggregation helpers for the DIMPLE pipeline.
+
+Writes the combined oligo and primer FASTA files, migrated out of
+``DIMPLE.DIMPLE``.
+"""
 
 from __future__ import annotations
 
+import os
 
-def print_all(ols, folder="", config=None):
-    """Compatibility wrapper for output aggregation."""
-    from DIMPLE.DIMPLE import _legacy_print_all
+from Bio import SeqIO
 
-    return _legacy_print_all(ols, folder=folder, config=config)
+from DIMPLE.core import DIMPLE
+
+
+def print_all(OLS, folder="", config=None):
+    """Writes oligos and primers to files."""
+    if not isinstance(OLS[0], DIMPLE):
+        raise TypeError("Not an instance of the DIMPLE class")
+    alloligos = []
+    allprimers = []
+    for obj in OLS:
+        try:
+            alloligos.extend(obj.oligos)
+            allprimers.extend(obj.barPrimer)
+            allprimers.extend(obj.genePrimer)
+        except AttributeError:
+            print(obj.geneid + " has not been processed")
+    # Remove redundant sequences?
+    SeqIO.write(
+        alloligos, os.path.join(folder.replace("\\", ""), "All_Oligos.fasta"), "fasta"
+    )
+    SeqIO.write(
+        allprimers, os.path.join(folder.replace("\\", ""), "All_Primers.fasta"), "fasta"
+    )
