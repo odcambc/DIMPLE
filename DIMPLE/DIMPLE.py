@@ -39,8 +39,8 @@ logger = logging.getLogger(__name__)
 
 # This function is not used in the current version of the code
 # This will find genes that share the same sequence and avoid synthesizing the same oligos multiple times
-def align_genevariation(OLS):
-    if not isinstance(OLS[0], DIMPLE):
+def align_genevariation(pool):
+    if not isinstance(pool[0], DIMPLE):
         raise TypeError("Not an instance of the DIMPLE class")
     def should_link_genes() -> bool:
         if DIMPLE.link_policy == "always":
@@ -56,11 +56,11 @@ def align_genevariation(OLS):
     aligner.mismatch_score = -1
     print("------------Finding homologous regions------------")
     # First find genes with matching sequences
-    for m in range(len(OLS)):
-        remlist = range(len(OLS))[m + 1 :]
+    for m in range(len(pool)):
+        remlist = range(len(pool))[m + 1 :]
         for p in remlist:
             alignments = aligner.align(
-                OLS[m].seq, OLS[p].seq
+                pool[m].seq, pool[p].seq
             )
             for alignment in alignments:
                 score = alignment.score
@@ -71,14 +71,14 @@ def align_genevariation(OLS):
                     x for x, geneset in enumerate(match) if m in geneset or p in geneset
                 ]  # Determine if aligned genes are in any of the previously matched sets
                 if not index:  # Create a new set if not
-                    print(OLS[m].geneid)
-                    print(OLS[p].geneid)
+                    print(pool[m].geneid)
+                    print(pool[p].geneid)
                     if should_link_genes():
                         match.append(set([m, p]))
                 else:
                     if p not in match[index[0]] or m not in match[index[0]]:
                         for items in match[index[0]].union(set([p, m])):
-                            print(OLS[items].geneid)
+                            print(pool[items].geneid)
                         if should_link_genes():
                             match[index[0]].add(p)
                             match[index[0]].add(m)
@@ -88,24 +88,24 @@ def align_genevariation(OLS):
             matchset = list(tmpset)
             print(
                 "Determining Gene Variation for genes:"
-                + ",".join([OLS[i].geneid for i in matchset])
+                + ",".join([pool[i].geneid for i in matchset])
             )
             max_gene_len = 0
             variablesites = set()
             for i, j in itertools.combinations(matchset, 2):
                 max_gene_len = max(
                     max_gene_len,
-                    len(OLS[i].seq) - 2 * DIMPLE.primerBuffer,
-                    len(OLS[j].seq) - 2 * DIMPLE.primerBuffer,
+                    len(pool[i].seq) - 2 * DIMPLE.primerBuffer,
+                    len(pool[j].seq) - 2 * DIMPLE.primerBuffer,
                 )
-                seq_match = SequenceMatcher(None, OLS[i].seq, OLS[j].seq)
+                seq_match = SequenceMatcher(None, pool[i].seq, pool[j].seq)
                 # Determine variable regions
                 variablesites.update(
                     [
                         x.size
                         for x in seq_match.get_matching_blocks()
-                        if x.size != len(OLS[i].seq)
-                        and x.size != len(OLS[j].seq)
+                        if x.size != len(pool[i].seq)
+                        and x.size != len(pool[j].seq)
                         and x.size != 0
                     ]
                 )  # not sure how to account for zero
@@ -153,7 +153,7 @@ def align_genevariation(OLS):
                 [] for x in range(max(matchset) + 1)
             ]  # a list of fragments that do not match
             for x in breaklist:
-                sequences = [str(OLS[i].seq[x[0] : x[1]]) for i in matchset]
+                sequences = [str(pool[i].seq[x[0] : x[1]]) for i in matchset]
                 index = [
                     matchset[i]
                     for i, x in enumerate(sequences)
@@ -172,14 +172,14 @@ def align_genevariation(OLS):
             ) in (
                 matchset
             ):  # setting these to the same variable should link them for processing later
-                OLS[
+                pool[
                     idx
                 ].problemsites = (problemsites)  # add gap range to problemsites variable to avoid breaking in a gap
-                OLS[idx].breaklist = breaklist
-                OLS[idx].fragsize = fragsize
-                OLS[idx].breaksites = breaksites
-                OLS[idx].linked.update(matchset)
-                OLS[idx].unique_Frag = unique_Frag[idx]
+                pool[idx].breaklist = breaklist
+                pool[idx].fragsize = fragsize
+                pool[idx].breaksites = breaksites
+                pool[idx].linked.update(matchset)
+                pool[idx].unique_Frag = unique_Frag[idx]
     else:
         print(
             "No redundant sequences found. Matching sequences may be too short or not aligned to reduce number of oligos synthesized"
@@ -187,7 +187,7 @@ def align_genevariation(OLS):
 
 
 def generate_DMS_fragments(
-    OLS,
+    pool,
     overlapL,
     overlapR,
     synonymous,
@@ -233,7 +233,7 @@ def generate_DMS_fragments(
         DIMPLE.breaksite_change_policy = getattr(
             config, "breaksite_change_policy", DIMPLE.breaksite_change_policy
         )
-    if not isinstance(OLS[0], DIMPLE):
+    if not isinstance(pool[0], DIMPLE):
         raise TypeError("Not an instance of the DIMPLE class")
     # Loop through each gene or gene variation
     finishedGenes = []
@@ -255,11 +255,11 @@ def generate_DMS_fragments(
         if delete and not insert and not dis:
             DIMPLE.maxfrag = DIMPLE.synth_len - DIMPLE.maxfrag_offset - overlapL - overlapR
         print("New max fragment:" + str(DIMPLE.maxfrag))
-        for gene in OLS:
-            switch_fragmentsize(gene, 1, OLS)
+        for gene in pool:
+            switch_fragmentsize(gene, 1, pool)
 
     # Generate oligos for each gene
-    for ii, gene in enumerate(OLS):
+    for ii, gene in enumerate(pool):
         print(gene.breaklist)
         print(
             "--------------------------------- Analyzing Gene:"
@@ -273,7 +273,7 @@ def generate_DMS_fragments(
             [tmp in finishedGenes for tmp in gene.linked]
         ):  # only run analysis for one of the linked genes
             # Quality Control for overhangs from the same gene
-            check_overhangs(gene, OLS, overlapL, overlapR)
+            check_overhangs(gene, pool, overlapL, overlapR)
         # Generate oligos and Primers
         idx = 0  # index for fragment
         totalcount = 0
@@ -338,7 +338,7 @@ def generate_DMS_fragments(
                     else:
                         print("Non specific primer R: " + reverse)
                     # swap size with another fragment
-                    skip = switch_fragmentsize(gene, idx, OLS)
+                    skip = switch_fragmentsize(gene, idx, pool)
                     if skip:
                         # if end of gene, try to extend primer to make it more specific?
                         if tmpr:
@@ -362,7 +362,7 @@ def generate_DMS_fragments(
                             )
                     else:
                         # Quality Control for overhangs from the same gene
-                        # check_overhangs(gene, OLS)
+                        # check_overhangs(gene, pool)
                         DIMPLE.barcodeF.extend(compileF)  # return unused barcodes
                         DIMPLE.barcodeR.extend(compileR)
                         compileF = []  # reset unused primers
@@ -373,7 +373,7 @@ def generate_DMS_fragments(
                         gene.barPrimer = []
                         idx = 0
                         continue  # return to the beginning
-                elif check_overhangs(gene, OLS, overlapL, overlapR):
+                elif check_overhangs(gene, pool, overlapL, overlapR):
                     DIMPLE.barcodeF.extend(compileF)  # return unused barcodes
                     DIMPLE.barcodeR.extend(compileR)
                     compileF = []  # reset unused primers

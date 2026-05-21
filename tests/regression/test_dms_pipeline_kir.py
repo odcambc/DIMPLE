@@ -70,10 +70,10 @@ def test_dms_pipeline_kir(tmp_path, dimple_human_usage, kir_fa, update_golden):
     DIMPLE.random_seed = 1848
 
     wDir = str(tmp_path) + "/"
-    OLS = addgene(str(gene_file))
+    pool = addgene(str(gene_file))
 
     generate_DMS_fragments(
-        OLS,
+        pool,
         DIMPLE.overlap,
         DIMPLE.overlap,
         True,                                   # synonymous
@@ -84,8 +84,8 @@ def test_dms_pipeline_kir(tmp_path, dimple_human_usage, kir_fa, update_golden):
         False,                                  # dis
         wDir,
     )
-    post_qc(OLS)
-    print_all(OLS, wDir)
+    post_qc(pool)
+    print_all(pool, wDir)
 
     if update_golden:
         for name in _GOLDEN_FILES:

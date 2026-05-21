@@ -30,16 +30,16 @@ class TestAddgeneStartEnd:
         _minimal_state(dimple_state)
         fa = tmp_path / "gene.fa"
         _write_fasta(fa, [("gene1 start:31 end:120", _GENE_SEQ)])
-        OLS = addgene(str(fa))
-        assert OLS[0].start == 30  # 31 - 1
+        pool = addgene(str(fa))
+        assert pool[0].start == 30  # 31 - 1
 
     def test_end_is_unchanged(self, tmp_path, dimple_state):
         """end: in FASTA header is stored as-is (no offset)."""
         _minimal_state(dimple_state)
         fa = tmp_path / "gene.fa"
         _write_fasta(fa, [("gene1 start:31 end:120", _GENE_SEQ)])
-        OLS = addgene(str(fa))
-        assert OLS[0].end == 120
+        pool = addgene(str(fa))
+        assert pool[0].end == 120
 
     def test_multi_record_returns_correct_count(self, tmp_path, dimple_state):
         """Multi-record FASTA produces one DIMPLE object per record."""
@@ -52,13 +52,13 @@ class TestAddgeneStartEnd:
                 ("geneB start:31 end:120", _GENE_SEQ),
             ],
         )
-        OLS = addgene(str(fa))
-        assert len(OLS) == 2
+        pool = addgene(str(fa))
+        assert len(pool) == 2
 
     def test_geneid_matches_fasta_name(self, tmp_path, dimple_state):
         """DIMPLE.geneid is set from the FASTA record name field."""
         _minimal_state(dimple_state)
         fa = tmp_path / "gene.fa"
         _write_fasta(fa, [("Kir start:31 end:120", _GENE_SEQ)])
-        OLS = addgene(str(fa))
-        assert OLS[0].geneid == "Kir"
+        pool = addgene(str(fa))
+        assert pool[0].geneid == "Kir"

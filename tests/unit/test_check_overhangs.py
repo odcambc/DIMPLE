@@ -27,17 +27,17 @@ def _make_gene(tmp_path, dimple_state):
     _setup_state(dimple_state)
     fa = tmp_path / "gene.fa"
     _write_fasta(fa, [("gene1 start:31 end:120", _GENE_SEQ)])
-    OLS = addgene(str(fa))
-    return OLS[0], OLS
+    pool = addgene(str(fa))
+    return pool[0], pool
 
 
 class TestCheckOverhangsUnique:
     def test_no_switch_when_overhangs_unique(self, tmp_path, dimple_state):
         """Returns False when all fragment overhangs are distinct."""
-        gene, OLS = _make_gene(tmp_path, dimple_state)
+        gene, pool = _make_gene(tmp_path, dimple_state)
         # Override seq with a varied pattern so the F/R overhang slices differ.
         gene.seq = Seq("ATCG" * 50)
-        switched = check_overhangs(gene, OLS, overlap_l=3, overlap_r=3)
+        switched = check_overhangs(gene, pool, overlap_l=3, overlap_r=3)
         assert switched is False
 
     def test_type_error_on_non_dimple(self, tmp_path, dimple_state):
@@ -50,10 +50,10 @@ class TestCheckOverhangsUnique:
 class TestCheckOverhangsPalindrome:
     def test_palindromic_overhang_detected(self, tmp_path, dimple_state):
         """A palindromic overhang (F == RC(F)) should be flagged and switch triggered."""
-        gene, OLS = _make_gene(tmp_path, dimple_state)
+        gene, pool = _make_gene(tmp_path, dimple_state)
         # Build a seq where overhang_F == overhang_R (all same base → trivially equal).
         # Use a repeated pattern to make every 4-mer the same ("AAAA").
         gene.seq = Seq("A" * 200)
         # switch_fragmentsize will run; we only assert that switched is True.
-        switched = check_overhangs(gene, OLS, overlap_l=3, overlap_r=3)
+        switched = check_overhangs(gene, pool, overlap_l=3, overlap_r=3)
         assert switched is True

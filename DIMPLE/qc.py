@@ -19,16 +19,16 @@ from DIMPLE.core import DIMPLE
 logger = logging.getLogger(__name__)
 
 
-def post_qc(OLS, config=None):
+def post_qc(pool, config=None):
     if config is not None:
         DIMPLE.enzyme = getattr(config, "enzyme", DIMPLE.enzyme)
     logger.info("Running post QC")
-    if not isinstance(OLS[0], DIMPLE):
+    if not isinstance(pool[0], DIMPLE):
         raise TypeError("Not an instance of the DIMPLE class")
     # Post QC
     all_oligos = []
     all_barPrimers = []
-    for obj in OLS:
+    for obj in pool:
         logger.info(f'Running QC for {obj.geneid}')
         try:
             all_oligos.extend(obj.oligos)
@@ -61,7 +61,7 @@ def post_qc(OLS, config=None):
         print("Checking primer set:" + primers[0].id[:-2])
         for idxCassette, fragment in enumerate(
             uCassette
-        ):  # iterate over every OLS oligo
+        ):  # iterate over every pool oligo
             if (
                 primers[0].id.split("_")[2] != all_oligos[idxCassette].id.split("_")[2]
             ):  # ignore designed annealing (same name)

@@ -71,7 +71,7 @@ def find_geneprimer(genefrag, start, end):
 
 
 def find_fragment_primer(fragment, stop):
-    # This function finds optimal primer for OLS subpool by changing 3' end of primer
+    # This function finds optimal primer for an oligo subpool by changing 3' end of primer
     start = 0  # starts at maximum length (5' is fixed)
     if stop > 25:  # limit primer to 25 bases to begin with
         end = 25

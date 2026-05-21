@@ -2,8 +2,8 @@
 
 A DIMPLE run takes a batch of genes and produces a single **oligo pool** (the
 synthesis-vendor deliverable; the wet-lab variant library is generated
-downstream from the pool). The pipeline has always passed this around as a bare
-``OLS`` list; ``Pool`` gives it a class and a home for the run configuration.
+downstream from the pool). The pipeline previously passed this around as a bare
+list of genes; ``Pool`` gives it a class and a home for the run configuration.
 
 This module owns three cohesive things: ``DimpleRuntimeConfig`` (the typed run
 config), ``Pool``, and ``addgene`` (the Pool factory). It is a near-leaf in the
@@ -60,7 +60,7 @@ class Pool:
     """An oligo pool: the ``DIMPLE`` genes of one run plus their shared config.
 
     Iterating / indexing a ``Pool`` yields its gene instances, so it substitutes
-    transparently for the bare ``OLS`` list the pipeline currently passes around
+    transparently for the bare gene list the pipeline previously passed around
     while config reads are migrated onto ``pool.config``.
     """
 

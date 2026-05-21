@@ -174,10 +174,10 @@ def run():
 
     apply_random_seed(DEFAULT_GUI_RANDOM_SEED, config=runtime_config)
 
-    OLS = addgene(app.geneFile)
+    pool = addgene(app.geneFile)
 
     apply_instance_settings(
-        OLS,
+        pool,
         aminoacids=app.substitutions.get().split(","),
         doublefrag=app.doublefrag.get(),
         gene_primer_tm=(
@@ -187,24 +187,24 @@ def run():
         config=runtime_config,
     )
     if app.avoid_breaksites.get():
-        OLS[0].problemsites = set(int(x) for x in app.custom_mutations.keys())
+        pool[0].problemsites = set(int(x) for x in app.custom_mutations.keys())
         # add extras
         if app.avoid_others_list.get() != "":
-            OLS[0].problemsites.update(
+            pool[0].problemsites.update(
                 [int(x) for x in app.avoid_others_list.get().split(",")]
             )
-        for i in range(len(OLS[0].breaksites)):
-            switch_fragmentsize(OLS[0], 1, OLS)
+        for i in range(len(pool[0].breaksites)):
+            switch_fragmentsize(pool[0], 1, pool)
 
     if app.matchSequences.get() == "match":
-        align_genevariation(OLS)
+        align_genevariation(pool)
 
     logger.info("Generating DMS fragments")
     app.output_text.insert(tk.END, "Generating DMS fragments\n")
 
     # Generate DMS fragments
     generate_DMS_fragments(
-        OLS,
+        pool,
         overlap_l,
         overlap_r,
         app.synonymous.get(),
@@ -219,8 +219,8 @@ def run():
 
     # Post QC checks and saving
     app.output_text.insert(tk.END, "Post QC checks and saving\n")
-    post_qc(OLS, config=runtime_config)
-    print_all(OLS, app.wDir, config=runtime_config)
+    post_qc(pool, config=runtime_config)
+    print_all(pool, app.wDir, config=runtime_config)
 
     logger.info("Finished")
     app.output_text.insert(tk.END, "Finished\n")

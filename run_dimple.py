@@ -280,12 +280,12 @@ else:
 
 resolve_codon_usage(args.usage, config=runtime_config)
 
-OLS = addgene(os.path.join(args.wDir, args.geneFile).strip())
+pool = addgene(os.path.join(args.wDir, args.geneFile).strip())
 
-apply_instance_settings(OLS, config=runtime_config)
+apply_instance_settings(pool, config=runtime_config)
 
 if args.matchSequences == "match":
-    align_genevariation(OLS)
+    align_genevariation(pool)
 if args.deletions:
     args.deletions = [int(x) for x in args.deletions]
 if not any([DIMPLE.dms, args.insertions, args.deletions]):
@@ -297,7 +297,7 @@ if args.insertions:
 logger.info("Generating DMS fragments")
 
 generate_DMS_fragments(
-    OLS,
+    pool,
     overlap_l,
     overlap_r,
     args.include_synonymous,
@@ -310,7 +310,7 @@ generate_DMS_fragments(
     config=runtime_config,
 )
 
-post_qc(OLS, config=runtime_config)
-print_all(OLS, args.wDir, config=runtime_config)
+post_qc(pool, config=runtime_config)
+print_all(pool, args.wDir, config=runtime_config)
 
 logger.info("Finished")

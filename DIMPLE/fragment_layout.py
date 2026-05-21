@@ -39,7 +39,7 @@ def recalculate_num_fragments(gene):
     return gene
 
 
-def switch_fragmentsize(gene, detectedsite, OLS):
+def switch_fragmentsize(gene, detectedsite, pool):
     """TODO:
     Docstring
     """
@@ -189,13 +189,13 @@ def switch_fragmentsize(gene, detectedsite, OLS):
     print(gene.fragsize)
     # align all linked genes to the same breaksites
     for tmp in gene.linked:
-        OLS[tmp].breaksites = gene.breaksites
-        OLS[tmp].fragsize = gene.fragsize
-        OLS[tmp].breaklist = gene.breaklist
+        pool[tmp].breaksites = gene.breaksites
+        pool[tmp].fragsize = gene.fragsize
+        pool[tmp].breaklist = gene.breaklist
     return skip
 
 
-def check_overhangs(gene, OLS, overlap_l, overlap_r):
+def check_overhangs(gene, pool, overlap_l, overlap_r):
     """TODO:
     Docstring
     """
@@ -234,7 +234,7 @@ def check_overhangs(gene, OLS, overlap_l, overlap_r):
             print(
                 "------------------ Fragment size swapped due to matching overhangs ------------------"
             )
-            skip = switch_fragmentsize(gene, detectedsite, OLS)
+            skip = switch_fragmentsize(gene, detectedsite, pool)
         else:  # if no detected sites
             break
     return switched

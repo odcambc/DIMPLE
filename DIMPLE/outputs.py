@@ -13,13 +13,13 @@ from Bio import SeqIO
 from DIMPLE.core import DIMPLE
 
 
-def print_all(OLS, folder="", config=None):
+def print_all(pool, folder="", config=None):
     """Writes oligos and primers to files."""
-    if not isinstance(OLS[0], DIMPLE):
+    if not isinstance(pool[0], DIMPLE):
         raise TypeError("Not an instance of the DIMPLE class")
     alloligos = []
     allprimers = []
-    for obj in OLS:
+    for obj in pool:
         try:
             alloligos.extend(obj.oligos)
             allprimers.extend(obj.barPrimer)
