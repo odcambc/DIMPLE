@@ -25,7 +25,7 @@ from DIMPLE.run_settings import (
     apply_restriction_settings,
     compute_overlaps_and_maxfrag,
     configure_dimple_logging,
-    get_runtime_config,
+    DimpleRuntimeConfig,
     normalize_avoid_list,
     resolve_codon_usage,
     validate_insertions,
@@ -231,7 +231,7 @@ if args.wDir is None:
     else:
         args.wDir = ""
 
-runtime_config = get_runtime_config()
+runtime_config = DimpleRuntimeConfig()
 
 apply_handle(args.handle, config=runtime_config)
 
@@ -280,7 +280,7 @@ else:
 
 resolve_codon_usage(args.usage, config=runtime_config)
 
-pool = addgene(os.path.join(args.wDir, args.geneFile).strip())
+pool = addgene(os.path.join(args.wDir, args.geneFile).strip(), runtime_config)
 
 apply_instance_settings(pool, config=runtime_config)
 

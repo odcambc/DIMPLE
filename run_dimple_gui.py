@@ -20,7 +20,7 @@ from DIMPLE.run_settings import (
     compute_overlaps_and_maxfrag,
     configure_dimple_logging,
     DEFAULT_GUI_RANDOM_SEED,
-    get_runtime_config,
+    DimpleRuntimeConfig,
     normalize_avoid_list,
     resolve_codon_usage,
     validate_insertions,
@@ -66,7 +66,7 @@ AMINO_ACIDS = [
 
 
 def run():
-    runtime_config = get_runtime_config()
+    runtime_config = DimpleRuntimeConfig()
     # Check that a mutation type is selected
     if not any(
         [
@@ -174,7 +174,7 @@ def run():
 
     apply_random_seed(DEFAULT_GUI_RANDOM_SEED, config=runtime_config)
 
-    pool = addgene(app.geneFile)
+    pool = addgene(app.geneFile, runtime_config)
 
     apply_instance_settings(
         pool,
