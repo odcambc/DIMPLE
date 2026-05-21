@@ -862,10 +862,33 @@ def generate_DMS_fragments(
                                 }
                 ### Scanning Domain Insertions
                 if dis:
+                    # Translate the domain insertion handle for naming in the output
+                    if len(DIMPLE.handle) % 3 == 0:
+                        handle_name = Seq(str(DIMPLE.handle)).translate()
+                    else:
+                        logger.warning(
+                            f'Domain insertion handle {DIMPLE.handle} is not a multiple of 3. Will not translate in output.'
+                        )
+                        handle_name = '(handle)'
                     # insertion
                     for i in range(offset, offset + frag[1] - frag[0], 3):
                         # if idx == 0:
                         #    continue
+                        pos = int(
+                            (frag[0] + i + 3 - offset - DIMPLE.primerBuffer) / 3
+                        )
+                        wt_pre_codon = tmpseq[i : i + 3].upper()
+                        wt_post_codon = tmpseq[i + 3 : i + 6].upper()
+                        wt_pre_aa = [
+                            name
+                            for name, codon in gene.SynonymousCodons.items()
+                            if wt_pre_codon in codon
+                        ]
+                        wt_post_aa = [
+                            name
+                            for name, codon in gene.SynonymousCodons.items()
+                            if wt_post_codon in codon
+                        ]
                         xfrag = (
                                 tmpseq[0:i] + DIMPLE.handle + tmpseq[i:]
                         )  # Add mutation to fragment
@@ -886,24 +909,34 @@ def generate_DMS_fragments(
                             logger.warning(
                                 "Unwanted restriction site found within domain insertion fragment: " + str(xfrag)
                             )
+                            break
                             # not sure how to solve this issue
                             # mutation?
                             # xfrag = tmpseq[0:i] + mutation + tmpseq[i + 3:]
+                        oligo_id = (
+                            gene.geneid + "_DIS-" + str(idx + 1) + "_" + str(pos)
+                        )
                         dms_sequences.append(
                             SeqRecord(
                                 xfrag,
-                                id=gene.geneid
-                                   + "_DIS-"
-                                   + str(idx + 1)
-                                   + "_"
-                                   + str(
-                                    int(
-                                        (frag[0] + i + 3 - offset - DIMPLE.primerBuffer) / 3
-                                    )
-                                ),
+                                id=oligo_id,
                                 description="Frag " + fragstart + "-" + fragend,
                             )
                         )
+                        name = f'{seq1(wt_pre_aa)}{pos}_{seq1(wt_post_aa)}{pos+1}_ins{handle_name}'
+                        gene.designed_variants[oligo_id] = {
+                                'count': 0,
+                                'pos': pos,
+                                'mutation_type': 'DI',
+                                'name': name,
+                                'codon': str(DIMPLE.handle),
+                                'wt_codon': '',
+                                'mutation': f'DI_{len(DIMPLE.handle) // 3}',
+                                'length': len(DIMPLE.handle) // 3,
+                                'hgvs': f'p.({name})',
+                                'fragment': idx + 1,
+                                'xfrag': xfrag,
+                        }
                 for idx_type, dms_sequence_list in enumerate(
                         [dms_sequences, dms_sequences_double]
                 ):
