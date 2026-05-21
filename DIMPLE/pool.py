@@ -25,7 +25,8 @@ from DIMPLE.core import DIMPLE
 
 logger = logging.getLogger(__name__)
 
-# Base primer buffer before overlap extension (matches DIMPLE.primerBuffer default).
+# Base primer buffer before overlap extension; compute_overlaps_and_maxfrag
+# raises it to PRIMER_BUFFER_BASE + overlap.
 PRIMER_BUFFER_BASE: int = 30
 
 # Bundled barcode primer sets, loaded once. Each DimpleRuntimeConfig gets its
