@@ -36,7 +36,7 @@ def post_qc(pool, config=None):
         except AttributeError:
             print(obj.geneid + " has not been processed")
 
-        if DIMPLE.enzyme is not None:
+        if pool.config.enzyme is not None:
             logger.info(f"Checking oligo assembly for {obj.geneid}")
             check_final_assembly(obj)
         else:
@@ -163,11 +163,12 @@ def check_final_assembly(gene, config=None):
     if config is not None:
         DIMPLE.enzyme = getattr(config, "enzyme", DIMPLE.enzyme)
 
+    cfg = gene.pool.config
     # Check whether the enzyme is set.
-    if DIMPLE.enzyme:
-        if DIMPLE.enzyme == "BsmBI":
+    if cfg.enzyme:
+        if cfg.enzyme == "BsmBI":
             enzyme = BsmBI
-        elif DIMPLE.enzyme == "BsaI":
+        elif cfg.enzyme == "BsaI":
             enzyme = BsaI
         else:
             logger.warning("Enzyme not recognized. Not performing assembly check.")
@@ -182,7 +183,7 @@ def check_final_assembly(gene, config=None):
     backbones = []
     oligo_primer_dseqs = []
     logger.info(f"Testing assembly for {gene.geneid}")
-    logger.info(f"Using enzyme: {DIMPLE.enzyme}")
+    logger.info(f"Using enzyme: {cfg.enzyme}")
     logger.info(f"Number of fragments: {n_fragments}")
 
     for frag in range(0, n_fragments):

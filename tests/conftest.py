@@ -23,6 +23,7 @@ from typing import Any, Dict
 import pytest
 
 from DIMPLE.DIMPLE import DIMPLE
+from DIMPLE.run_settings import reset_runtime_config
 
 
 # Class attributes that integration/regression tests commonly override.
@@ -79,6 +80,9 @@ def dimple_state():
     snapshot: Dict[str, Any] = {
         name: _snapshot_raw(DIMPLE, name) for name in _MANAGED_ATTRS
     }
+    # Drop any cached runtime config so each test's addgene() rebuilds the
+    # DimpleRuntimeConfig from this test's class state (Pool migration).
+    reset_runtime_config()
 
     yield DIMPLE
 

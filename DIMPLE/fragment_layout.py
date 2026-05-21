@@ -16,8 +16,8 @@ def recalculate_num_fragments(gene):
     )  # total bins needed (rounded up)
     insertionsites = range(gene.start + 3, gene.end, 3)
     gene.fragsize = [len(insertionsites[i::num]) * 3 for i in list(range(num))]
-    total = DIMPLE.primerBuffer
-    breaksites = [DIMPLE.primerBuffer]
+    total = gene.pool.config.primer_buffer
+    breaksites = [gene.pool.config.primer_buffer]
     for x in gene.fragsize:
         total += x
         breaksites.extend([total])
@@ -51,7 +51,7 @@ def switch_fragmentsize(gene, detectedsite, pool):
     count2 = 0
     print("Non specific Fragment:" + str(detectedsite))
     if (
-        len(gene.fragsize) * gene.maxfrag < len(gene.seq) - gene.primerBuffer * 2
+        len(gene.fragsize) * gene.maxfrag < len(gene.seq) - gene.pool.config.primer_buffer * 2
     ):  # if the maxfrag has changed and it is impossible to split the gene into x number of fragments it should recalculate the number of fragments
         gene = recalculate_num_fragments(gene)
     else:
@@ -207,10 +207,10 @@ def check_overhangs(gene, pool, overlap_l, overlap_r):
         detectedsites = set()  # stores matching overhangs
         for idx, y in enumerate(gene.breaklist):
             overhang_F = gene.seq[
-                y[0] - DIMPLE.cutsite_overhang - overlap_l: y[0] - overlap_r
+                y[0] - gene.pool.config.cutsite_overhang - overlap_l: y[0] - overlap_r
             ]  # Forward overhang
             overhang_R = gene.seq[
-                y[1] + overlap_l: y[1] + DIMPLE.cutsite_overhang + overlap_r
+                y[1] + overlap_l: y[1] + gene.pool.config.cutsite_overhang + overlap_r
             ]  # Reverse overhang
             if (
                 overhang_F == overhang_R
