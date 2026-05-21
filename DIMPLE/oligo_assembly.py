@@ -4,18 +4,17 @@ from __future__ import annotations
 
 from Bio.SeqRecord import SeqRecord
 
-from DIMPLE.core import DIMPLE
 
-
-def combine_fragments(tandem, num_frag_per_oligo, split):
+def combine_fragments(tandem, num_frag_per_oligo, split, pool):
     """TODO:
     Docstring
     """
+    cfg = pool.config
     tandem_seq = []
     barcodes = []
     if split:
-        tmpF = DIMPLE.barcodeF.pop(0)
-        tmpR = DIMPLE.barcodeR.pop(0)
+        tmpF = cfg.barcode_f.pop(0)
+        tmpR = cfg.barcode_r.pop(0)
     direction = -1
     while len(tandem) > num_frag_per_oligo:
         tmp = tandem.pop(0)
@@ -28,10 +27,10 @@ def combine_fragments(tandem, num_frag_per_oligo, split):
                 if direction == 1:
                     tmp_tandem += (
                         "G"
-                        + DIMPLE.cutsite.reverse_complement()
+                        + cfg.cutsite.reverse_complement()
                         + tmpR
                         + tmpF
-                        + DIMPLE.cutsite
+                        + cfg.cutsite
                         + "C"
                         + tmp.seq
                     )  # concatenate and add cut sites with buffer
@@ -39,10 +38,10 @@ def combine_fragments(tandem, num_frag_per_oligo, split):
                 else:
                     tmp_tandem += (
                         "G"
-                        + DIMPLE.cutsite.reverse_complement()
+                        + cfg.cutsite.reverse_complement()
                         + tmpR
                         + tmpF
-                        + DIMPLE.cutsite
+                        + cfg.cutsite
                         + "C"
                         + tmp.seq.reverse_complement()
                     )  # concatenate and add cut sites with buffer
@@ -55,9 +54,9 @@ def combine_fragments(tandem, num_frag_per_oligo, split):
                 if direction == 1:
                     tmp_tandem += (
                         "G"
-                        + DIMPLE.cutsite.reverse_complement()
+                        + cfg.cutsite.reverse_complement()
                         + "ACGT"
-                        + DIMPLE.cutsite
+                        + cfg.cutsite
                         + "C"
                         + tmp.seq
                     )  # concatenate and add cut sites with buffer
@@ -65,9 +64,9 @@ def combine_fragments(tandem, num_frag_per_oligo, split):
                 else:
                     tmp_tandem += (
                         "G"
-                        + DIMPLE.cutsite.reverse_complement()
+                        + cfg.cutsite.reverse_complement()
                         + "ACGT"
-                        + DIMPLE.cutsite
+                        + cfg.cutsite
                         + "C"
                         + tmp.seq.reverse_complement()
                     )
@@ -88,9 +87,9 @@ def combine_fragments(tandem, num_frag_per_oligo, split):
                 if direction == 1:
                     tmp_tandem += (
                         "G"
-                        + DIMPLE.cutsite.reverse_complement()
+                        + cfg.cutsite.reverse_complement()
                         + "ACGT"
-                        + DIMPLE.cutsite
+                        + cfg.cutsite
                         + "C"
                         + tmp.seq
                     )  # concatenate and add cut sites with buffer
@@ -98,9 +97,9 @@ def combine_fragments(tandem, num_frag_per_oligo, split):
                 else:
                     tmp_tandem += (
                         "G"
-                        + DIMPLE.cutsite.reverse_complement()
+                        + cfg.cutsite.reverse_complement()
                         + "ACGT"
-                        + DIMPLE.cutsite
+                        + cfg.cutsite
                         + "C"
                         + tmp.seq.reverse_complement()
                     )  # concatenate and add cut sites with buffer
@@ -113,9 +112,9 @@ def combine_fragments(tandem, num_frag_per_oligo, split):
                 if direction == -1:
                     tmp_tandem += (
                         "G"
-                        + DIMPLE.cutsite.reverse_complement()
+                        + cfg.cutsite.reverse_complement()
                         + "ACGT"
-                        + DIMPLE.cutsite
+                        + cfg.cutsite
                         + "C"
                         + tmp.seq
                     )  # concatenate and add cut sites with buffer
@@ -123,20 +122,20 @@ def combine_fragments(tandem, num_frag_per_oligo, split):
                 else:
                     tmp_tandem += (
                         "G"
-                        + DIMPLE.cutsite.reverse_complement()
+                        + cfg.cutsite.reverse_complement()
                         + "ACGT"
-                        + DIMPLE.cutsite
+                        + cfg.cutsite
                         + "C"
                         + tmp.seq
                     )
                     direction = -1
                 tandem_id += "+" + tmp.id
         difference = len(tandem_seq[-1].seq) - len(tmp_tandem)
-        barF = DIMPLE.barcodeF.pop(0)
-        barR = DIMPLE.barcodeR.pop(0)
+        barF = cfg.barcode_f.pop(0)
+        barR = cfg.barcode_r.pop(0)
         while difference / 2 > len(barF):
-            barF += DIMPLE.barcodeF.pop(0)
-            barR += DIMPLE.barcodeR.pop(0)
+            barF += cfg.barcode_f.pop(0)
+            barR += cfg.barcode_r.pop(0)
         tmpfrag = (
             barF.seq[0 : int(difference / 2)]
             + tmp_tandem

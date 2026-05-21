@@ -15,12 +15,13 @@ from DIMPLE.core import DIMPLE
 logger = logging.getLogger(__name__)
 
 
-def find_geneprimer(genefrag, start, end):
+def find_geneprimer(genefrag, start, end, pool):
+    cfg = pool.config
     # 3' end of primer is variable to adjust melting temperature
     # 5' end of primer is fixed, with restriction site added
     # Also add space for maximum deletion on 5' end
     primer = (
-        genefrag[start:end].complement() + DIMPLE.cutsite[::-1] + "ATA"
+        genefrag[start:end].complement() + cfg.cutsite[::-1] + "ATA"
     )  # added ATA for cleavage close to end of DNA fragment
     # Check melting temperature
     # find complementary sequences
@@ -32,15 +33,15 @@ def find_geneprimer(genefrag, start, end):
     tm4 = mt.Tm_NN(primer[0: end - start + comp], nn_table=mt.DNA_NN4)
     count = 0
     while (
-        tm2 < DIMPLE.gene_primerTm[0]
-        or tm2 > DIMPLE.gene_primerTm[1]
-        or tm4 < DIMPLE.gene_primerTm[0]
-        or tm4 > DIMPLE.gene_primerTm[1]
+        tm2 < cfg.gene_primer_tm[0]
+        or tm2 > cfg.gene_primer_tm[1]
+        or tm4 < cfg.gene_primer_tm[0]
+        or tm4 > cfg.gene_primer_tm[1]
     ):
-        if tm2 < DIMPLE.gene_primerTm[0] or tm4 < DIMPLE.gene_primerTm[0]:
+        if tm2 < cfg.gene_primer_tm[0] or tm4 < cfg.gene_primer_tm[0]:
             start += -1
             primer = (
-                genefrag[start:end].complement() + DIMPLE.cutsite[::-1] + "ATA"
+                genefrag[start:end].complement() + cfg.cutsite[::-1] + "ATA"
             )  # cut site addition
             tm2 = mt.Tm_NN(primer[0: end - start + comp], nn_table=mt.DNA_NN2)
             tm4 = mt.Tm_NN(primer[0: end - start + comp], nn_table=mt.DNA_NN4)
@@ -48,9 +49,9 @@ def find_geneprimer(genefrag, start, end):
             count > 12 or start == 0
         ):  # stop if caught in inf loop or if linker is at max (31 + 7 = 38 bases)
             break
-        if tm2 > DIMPLE.gene_primerTm[1] and tm4 > DIMPLE.gene_primerTm[1]:
+        if tm2 > cfg.gene_primer_tm[1] and tm4 > cfg.gene_primer_tm[1]:
             start += 1
-            primer = genefrag[start:end].complement() + DIMPLE.cutsite[::-1] + "ATA"
+            primer = genefrag[start:end].complement() + cfg.cutsite[::-1] + "ATA"
             # tm = mt.Tm_NN(primer[0:e-s+comp],c_seq=genefrag[s:e+comp],nn_table=mt.DNA_NN2)
             tm2 = mt.Tm_NN(primer[0: end - start + comp], nn_table=mt.DNA_NN2)
             tm4 = mt.Tm_NN(primer[0: end - start + comp], nn_table=mt.DNA_NN4)
