@@ -20,20 +20,20 @@ _SHORT_ATRICH = Seq("ATATATATAT")
 
 
 class TestFindFragmentPrimerNormal:
-    def test_returns_primer_and_float_tm(self, dimple_state):
+    def test_returns_primer_and_float_tm(self):
         """Return type is (Seq, float)."""
         primer, tm = find_fragment_primer(_BALANCED_25MER, stop=25)
         assert isinstance(tm, float)
         assert len(primer) >= 1
 
-    def test_primer_within_minimum_length(self, dimple_state):
+    def test_primer_within_minimum_length(self):
         """Returned primer is at least 16 nt when stop allows it."""
         primer, tm = find_fragment_primer(_BALANCED_25MER, stop=25)
         # If the function found a valid Tm primer, len >= 16; if it fell back to
         # the count>12 exit, len == stop (25 >= 16 still).  Either way >= 16.
         assert len(primer) >= 16
 
-    def test_tm_in_configured_window(self, dimple_state):
+    def test_tm_in_configured_window(self):
         """For a balanced-GC 25-mer the Tm should lie within primerTm bounds.
 
         Tolerance is ±2 °C to account for rounding across the two Tm tables
@@ -47,13 +47,13 @@ class TestFindFragmentPrimerNormal:
 
 
 class TestFindFragmentPrimerAdversarial:
-    def test_short_input_terminates(self, dimple_state):
+    def test_short_input_terminates(self):
         """An AT-rich fragment shorter than the minimum primer length terminates."""
         primer, tm = find_fragment_primer(_SHORT_ATRICH, stop=len(_SHORT_ATRICH))
         # The function must return — no infinite loop.
         assert primer is not None
 
-    def test_stop_less_than_minimum_terminates(self, dimple_state):
+    def test_stop_less_than_minimum_terminates(self):
         """stop < 16 triggers the count>12 / end>stop exit; must not hang."""
         primer, tm = find_fragment_primer(_BALANCED_25MER, stop=10)
         assert len(primer) <= 10

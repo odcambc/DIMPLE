@@ -1,21 +1,19 @@
 """Core domain model for DIMPLE: the per-gene ``DIMPLE`` class.
 
-The ``DIMPLE`` class still holds both per-gene state and class-level
-library-design configuration (mutable class attributes set by callers /
-``run_settings``). Moving that configuration onto the ``Pool`` object is the
-in-progress Pool-extraction refactor. This module is a leaf in the package
-import graph -- it depends only on ``DIMPLE.utilities`` and biopython -- so
-``pool``, the functional modules, and the ``DIMPLE.DIMPLE`` orchestrator can
-import the class from here without an import cycle.
+A ``DIMPLE`` instance models one gene of an oligo pool -- its sequence,
+fragments, oligos, and primers. Run-wide configuration lives on the pool's
+:class:`~DIMPLE.pool.DimpleRuntimeConfig`, reachable from any gene via
+``gene.pool.config``. This module is a leaf in the package import graph -- it
+depends only on ``DIMPLE.utilities`` and biopython -- so ``pool``, the
+functional modules, and the ``DIMPLE.DIMPLE`` orchestrator can import the class
+from here without an import cycle.
 """
 
 from __future__ import annotations
 
 import logging
-import os
 
 import numpy as np
-from Bio import SeqIO
 
 from DIMPLE.utilities import findORF
 
@@ -23,53 +21,12 @@ logger = logging.getLogger(__name__)
 
 
 class DIMPLE:
-    """Class for generating indel mutagenic scanning libraries."""
+    """A single gene of a DIMPLE oligo pool."""
 
-    # Calculate and update maxfrag - Max number of nucleotides that a fragment can carry
-    @property
-    def synth_len(self):
-        return self._synth_len
-
-    @synth_len.setter
-    def synth_len(self, value):
-        self._synth_len = value
-        self.maxfrag = value - self.maxfrag_offset
-
-    random_seed = 0
-    non_interactive = False
-    preferred_orf_index = None
-    link_policy = "prompt"  # prompt|always|never
-    breaksite_change_policy = "prompt"  # prompt|warn|error
-
-    # Shared variables for all genes
-    # Number of nucleotides in synthesis length to preserve for cutsites and primers. Cutsites are
-    # composed of the cutsite, the cutsite buffer, and the cutsite overhang
-    # Length of cutsite is
-    # len_cutsite = len(DIMPLE.cutsite) + len(DIMPLE.cutsite_buffer) + DIMPLE.cutsite_overhang
-    # Max oligo primer pair length is 2*21 = 42
-    # len_cutsite = len(self.cutsite) + len(self.cutsite_buffer) + self.cutsite_overhang = 22
-    maxfrag_offset = 64
-    minfrag = 24  # Picked based on smallest size for golden gate fragment efficiency
-    primerBuffer = 30  # This extends the sequence beyond the ORF for a primer. Must be greater than 30
-    allhangF = []
-    allhangR = []
-    primerTm = (56.5, 60)  # Melting temperature limits for primers
-    gene_primerTm = (58, 62)  # Help gene primer amplification
-    # BsaI / BsmBI / None; set by run_settings or callers before pipeline
-    enzyme = None
-    # Load Barcodes
-    dataDirectory = os.path.abspath(os.path.dirname(__file__))
-    try:
-        barcodeF = list(
-            SeqIO.parse(dataDirectory + "/data/forward_finalprimers.fasta", "fasta")
-        )
-        barcodeR = list(
-            SeqIO.parse(dataDirectory + "/data/reverse_finalprimers.fasta", "fasta")
-        )
-    except FileNotFoundError as exc:
-        raise ValueError(
-            "Could not find barcode files. Please upload your own or place standard barcodes in the data file."
-        ) from exc
+    # Fixed constants (not run configuration -- never change per run).
+    maxfrag_offset = 64  # nt reserved for barcodes, cut sites, and handle
+    minfrag = 24  # smallest size for golden gate fragment efficiency
+    primerTm = (56.5, 60)  # melting temperature limits for fragment primers
 
     def __init__(self, gene, start=None, end=None, pool=None):
 

@@ -20,8 +20,6 @@ logger = logging.getLogger(__name__)
 
 
 def post_qc(pool, config=None):
-    if config is not None:
-        DIMPLE.enzyme = getattr(config, "enzyme", DIMPLE.enzyme)
     logger.info("Running post QC")
     if not isinstance(pool[0], DIMPLE):
         raise TypeError("Not an instance of the DIMPLE class")
@@ -160,8 +158,6 @@ def post_qc(pool, config=None):
 def check_final_assembly(gene, config=None):
     """Test that each oligo assembles properly and contains the designed mutation."""
 
-    if config is not None:
-        DIMPLE.enzyme = getattr(config, "enzyme", DIMPLE.enzyme)
 
     cfg = gene.pool.config
     # Check whether the enzyme is set.

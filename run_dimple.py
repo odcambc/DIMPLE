@@ -292,7 +292,7 @@ if not any([DIMPLE.dms, args.insertions, args.deletions]):
     raise ValueError("Didn't select any mutations to generate")
 
 if args.insertions:
-    validate_insertions(list(args.insertions))
+    validate_insertions(list(args.insertions), runtime_config)
 
 logger.info("Generating DMS fragments")
 

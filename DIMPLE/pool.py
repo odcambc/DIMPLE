@@ -97,19 +97,13 @@ class Pool:
         return len(self.genes)
 
 
-def addgene(genefile, config: Optional[DimpleRuntimeConfig] = None, start=None, end=None):
+def addgene(genefile, config: DimpleRuntimeConfig, start=None, end=None):
     """Build an oligo :class:`Pool` from a FASTA file containing one or more genes.
 
     Each gene becomes a :class:`DIMPLE` instance carrying a ``pool``
-    back-reference. ``config`` is transitional-optional: when omitted it falls
-    back to the ``run_settings`` runtime-config singleton (Phase 3 of the Pool
-    migration makes it required).
+    back-reference. ``config`` is the run configuration (built and populated by
+    ``run_settings`` helpers, or constructed directly).
     """
-    if config is None:
-        # Transitional fallback until all callers pass an explicit config.
-        from DIMPLE.run_settings import get_runtime_config
-
-        config = get_runtime_config()
     pool = Pool(config)
     print("Barcode: " + str(config.barcode_f[0].seq))
     print("Number of barcodes: " + str(len(config.barcode_f)))

@@ -218,21 +218,6 @@ def generate_DMS_fragments(
     # dms set to true for subsitition mutations
     # insert set to a list of insertions
     # delete set to a list of numbers of symmetrical deletions
-    if config is not None:
-        DIMPLE.dms = getattr(config, "dms", DIMPLE.dms)
-        DIMPLE.stop_codon = getattr(config, "stop_codon", DIMPLE.stop_codon)
-        DIMPLE.make_double = getattr(config, "make_double", DIMPLE.make_double)
-        DIMPLE.maximize_nucleotide_change = getattr(
-            config, "maximize_nucleotide_change", DIMPLE.maximize_nucleotide_change
-        )
-        DIMPLE.non_interactive = getattr(config, "non_interactive", DIMPLE.non_interactive)
-        DIMPLE.preferred_orf_index = getattr(
-            config, "preferred_orf_index", DIMPLE.preferred_orf_index
-        )
-        DIMPLE.link_policy = getattr(config, "link_policy", DIMPLE.link_policy)
-        DIMPLE.breaksite_change_policy = getattr(
-            config, "breaksite_change_policy", DIMPLE.breaksite_change_policy
-        )
     if not isinstance(pool[0], DIMPLE):
         raise TypeError("Not an instance of the DIMPLE class")
     # Loop through each gene or gene variation
@@ -451,7 +436,7 @@ def generate_DMS_fragments(
                     # find custom mutations in the fragment range
                     tmp_positions = list(custom_mutations.keys())
                     tmp_tmp_positions = [
-                        x * 3 - 3 + gene.primerBuffer
+                        x * 3 - 3 + pool.config.primer_buffer
                         for x in list(custom_mutations.keys())
                     ]
                     tmp_mut_positions = [
@@ -499,7 +484,7 @@ def generate_DMS_fragments(
                                     if aa not in wt_codon
                                 ]
                                 p = [
-                                    gene.usage[aa] for aa in codons
+                                    pool.config.usage[aa] for aa in codons
                                 ]  # Find probabilities but not wild type codon
                                 p = [
                                     xp if xp > 0.1 else 0 for xp in p

@@ -167,7 +167,7 @@ def run():
             app.output_text.insert(tk.END, message + "\n")
             warnings.warn(message)
         try:
-            validate_insertions(insertions)
+            validate_insertions(insertions, runtime_config)
         except ValueError as exc:
             app.output_text.insert(tk.END, f"Error: {exc}\n")
             raise
