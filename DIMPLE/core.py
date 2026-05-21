@@ -1,12 +1,12 @@
-"""Core domain model for DIMPLE: the ``DIMPLE`` class and the ``addgene`` loader.
+"""Core domain model for DIMPLE: the per-gene ``DIMPLE`` class.
 
-The ``DIMPLE`` class holds both per-gene state and class-level library-design
-configuration (mutable class attributes set by callers / ``run_settings``).
-That conflation is a known smell; separating per-gene state from global
-configuration is tracked as a follow-up refactor. This module is a leaf in the
-package import graph -- it depends only on ``DIMPLE.utilities`` and biopython,
-so functional modules (``primers``, ``qc``, ...) and the ``DIMPLE.DIMPLE``
-orchestrator can import the class from here without an import cycle.
+The ``DIMPLE`` class still holds both per-gene state and class-level
+library-design configuration (mutable class attributes set by callers /
+``run_settings``). Moving that configuration onto the ``Pool`` object is the
+in-progress Pool-extraction refactor. This module is a leaf in the package
+import graph -- it depends only on ``DIMPLE.utilities`` and biopython -- so
+``pool``, the functional modules, and the ``DIMPLE.DIMPLE`` orchestrator can
+import the class from here without an import cycle.
 """
 
 from __future__ import annotations
@@ -20,32 +20,6 @@ from Bio import SeqIO
 from DIMPLE.utilities import findORF
 
 logger = logging.getLogger(__name__)
-
-
-def addgene(genefile, start=None, end=None):
-    """Generate a list of DIMPLE classes from a fasta file containing genes."""
-    print("Barcode: " + str(DIMPLE.barcodeF[0].seq))
-    print("Number of barcodes: " + str(len(DIMPLE.barcodeF)))
-    if start is None:
-        start = []
-    if end is None:
-        end = []
-    tmpgene = list(SeqIO.parse(genefile.replace("\\", ""), "fasta"))
-    tmpgene[0].seq = tmpgene[0].seq.upper()
-    tmpOLS = []
-    for gene in tmpgene:
-        if "start:" in gene.description and "end:" in gene.description:
-            start = int(gene.description.split("start:")[1].split(" ")[0]) - 1
-            end = int(gene.description.split("end:")[1].split(" ")[0])
-            gene.filename = genefile.replace("\\", "")
-            logger.info("Found start: " + str(start) + " and end: " + str(end))
-            logger.info("Inferred ORF sequence: " + str(gene.seq[start:end]))
-            logger.info("ORF translation: " + str(gene.seq[start:end].translate()))
-            tmpOLS.append(DIMPLE(gene, start, end))
-        else:
-            gene.filename = genefile.replace("\\", "")
-            tmpOLS.append(DIMPLE(gene, start, end))
-    return tmpOLS  # only return the class object itself if one gene is given
 
 
 class DIMPLE:

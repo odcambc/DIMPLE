@@ -23,7 +23,8 @@ import re
 import warnings
 from difflib import SequenceMatcher
 from math import ceil
-from DIMPLE.core import DIMPLE, addgene
+from DIMPLE.core import DIMPLE
+from DIMPLE.pool import addgene, Pool, DimpleRuntimeConfig
 
 from Bio import SeqIO, Align
 from Bio.Seq import Seq

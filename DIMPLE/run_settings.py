@@ -16,47 +16,16 @@ import logging
 import os
 import re
 import warnings
-from dataclasses import dataclass
 from typing import List, Optional, Union
 
 from Bio.Seq import Seq
 
 from DIMPLE.core import DIMPLE
+from DIMPLE.pool import DimpleRuntimeConfig, PRIMER_BUFFER_BASE
 from DIMPLE.utilities import codon_usage
-
-# Base primer buffer before overlap extension (matches DIMPLE.primerBuffer default).
-PRIMER_BUFFER_BASE: int = 30
 
 # Default GUI random seed (matches historical GUI behavior and tests).
 DEFAULT_GUI_RANDOM_SEED: int = 1848
-
-
-@dataclass
-class DimpleRuntimeConfig:
-    """Explicit runtime settings used by CLI/GUI and core pipeline."""
-
-    handle: str = ""
-    usage: Optional[dict] = None
-    cutsite: Optional[Seq] = None
-    cutsite_buffer: Optional[Seq] = None
-    cutsite_overhang: int = 0
-    enzyme: Optional[str] = None
-    synth_len: Optional[int] = None
-    maxfrag: Optional[int] = None
-    primer_buffer: int = PRIMER_BUFFER_BASE
-    random_seed: Optional[int] = 0
-    avoid_sequence: Optional[List[Seq]] = None
-    barcode_f: Optional[list] = None
-    barcode_r: Optional[list] = None
-    dms: bool = False
-    stop_codon: bool = False
-    make_double: bool = False
-    maximize_nucleotide_change: bool = False
-    gene_primer_tm: tuple[int, int] = (58, 62)
-    non_interactive: bool = False
-    preferred_orf_index: Optional[int] = None
-    link_policy: str = "prompt"
-    breaksite_change_policy: str = "prompt"
 
 
 _RUNTIME_CONFIG: Optional[DimpleRuntimeConfig] = None
