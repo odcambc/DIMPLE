@@ -21,7 +21,7 @@ from typing import List, Optional, Union
 
 from Bio.Seq import Seq
 
-from DIMPLE.DIMPLE import DIMPLE
+from DIMPLE.core import DIMPLE
 from DIMPLE.utilities import codon_usage
 
 # Base primer buffer before overlap extension (matches DIMPLE.primerBuffer default).
