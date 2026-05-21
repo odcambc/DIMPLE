@@ -12,6 +12,7 @@ from Bio import SeqIO
 from Bio.Seq import Seq
 
 from DIMPLE.DIMPLE import DIMPLE
+from DIMPLE.pool import Pool
 from DIMPLE.run_settings import (
     DimpleRuntimeConfig,
     PRIMER_BUFFER_BASE,
@@ -244,20 +245,24 @@ class TestRunSettings(unittest.TestCase):
             self.assertGreater(os.path.getsize(log_path), 0)
 
     def test_breaksites_non_interactive_error_policy_raises(self) -> None:
+        config = DimpleRuntimeConfig(
+            non_interactive=True, breaksite_change_policy="error"
+        )
         gene = DIMPLE.__new__(DIMPLE)
         gene.geneid = "dummy"
+        gene.pool = Pool(config)
         gene._DIMPLE__breaksites = [30, 60, 90]
-        DIMPLE.non_interactive = True
-        DIMPLE.breaksite_change_policy = "error"
         with self.assertRaises(ValueError):
             gene.breaksites = [33, 60, 90]
 
     def test_breaksites_non_interactive_warn_policy_allows(self) -> None:
+        config = DimpleRuntimeConfig(
+            non_interactive=True, breaksite_change_policy="warn"
+        )
         gene = DIMPLE.__new__(DIMPLE)
         gene.geneid = "dummy"
+        gene.pool = Pool(config)
         gene._DIMPLE__breaksites = [30, 60, 90]
-        DIMPLE.non_interactive = True
-        DIMPLE.breaksite_change_policy = "warn"
         gene.breaksites = [33, 60, 90]
         self.assertEqual(gene.breaksites, [33, 60, 90])
 

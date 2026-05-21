@@ -71,18 +71,21 @@ class DIMPLE:
             "Could not find barcode files. Please upload your own or place standard barcodes in the data file."
         ) from exc
 
-    def __init__(self, gene, start=None, end=None):
+    def __init__(self, gene, start=None, end=None, pool=None):
+
+        self.pool = pool
+        cfg = pool.config
 
         # Set up random number generator
-        self.rng = np.random.default_rng(DIMPLE.random_seed)
+        self.rng = np.random.default_rng(cfg.random_seed)
 
         #  Search for ORF
-        try:
-            DIMPLE.maxfrag  # if DIMPLE.maxfrag doesn't exist, create it
-        except AttributeError:
-            DIMPLE.maxfrag = (
-                self.synth_len - self.maxfrag_offset
+        maxfrag = cfg.maxfrag
+        if maxfrag is None:
+            maxfrag = (
+                cfg.synth_len - self.maxfrag_offset
             )  # based on space for barcodes, cut sites, handle. Doesn't need to be exact
+            cfg.maxfrag = maxfrag
 
         self.geneid = gene.name
         self.linked = set()
@@ -140,7 +143,7 @@ class DIMPLE:
             "Glu",
             "Tyr"
         ]
-        if self.stop_codon:
+        if cfg.stop_codon:
             self.aminoacids.append("STOP")
         self.complement = {"A": "T", "C": "G", "G": "C", "T": "A"}
 
@@ -151,12 +154,12 @@ class DIMPLE:
         match_sites = [
                 gene.seq.upper().count(cut)
                 + gene.seq.upper().count(cut.reverse_complement())
-                for cut in DIMPLE.avoid_sequence
+                for cut in cfg.avoid_sequence
             ]
         if any(match_sites):
             raise ValueError(
                 "Unwanted Restriction cut sites found. Please input plasmids with these removed."
-                + str([DIMPLE.avoid_sequence[i] for i, x in enumerate(match_sites) if bool(x)])
+                + str([cfg.avoid_sequence[i] for i, x in enumerate(match_sites) if bool(x)])
             )  # change codon
 
         # Check for ORF specification and record start and end
@@ -175,8 +178,8 @@ class DIMPLE:
             logger.info("Start and end of ORF were not provided. Manually identifying ORF.")
             start, end = findORF(
                 gene,
-                non_interactive=DIMPLE.non_interactive,
-                preferred_orf_index=DIMPLE.preferred_orf_index,
+                non_interactive=cfg.non_interactive,
+                preferred_orf_index=cfg.preferred_orf_index,
             )
             logger.info("Found the following positions: Start: " + str(start) + " End: " + str(end))
 
@@ -188,23 +191,23 @@ class DIMPLE:
 
 
         # record sequence with extra bp to account for primer. for plasmids (circular) we can rearrange linear sequence)
-        if start - self.primerBuffer < 0:
+        if start - cfg.primer_buffer < 0:
             self.seq = (
-                gene.seq[start + 3 - self.primerBuffer:]
-                + gene.seq[: end + self.primerBuffer]
+                gene.seq[start + 3 - cfg.primer_buffer:]
+                + gene.seq[: end + cfg.primer_buffer]
             )
-        elif end + self.primerBuffer > len(gene.seq):
+        elif end + cfg.primer_buffer > len(gene.seq):
             self.seq = (
-                gene.seq[start + 3 - self.primerBuffer:]
-                + gene.seq[: end + self.primerBuffer - len(gene.seq)]
+                gene.seq[start + 3 - cfg.primer_buffer:]
+                + gene.seq[: end + cfg.primer_buffer - len(gene.seq)]
             )
         else:
-            self.seq = gene.seq[start + 3 - self.primerBuffer: end + self.primerBuffer]
+            self.seq = gene.seq[start + 3 - cfg.primer_buffer: end + cfg.primer_buffer]
         self.seq = self.seq.upper()
 
         # Determine Fragment Size and store beginning and end of each fragment
         num = int(
-            round(((end - start - 3) / float(DIMPLE.maxfrag)) + 0.499999999)
+            round(((end - start - 3) / float(maxfrag)) + 0.499999999)
         )  # total bins needed (rounded up)
 
         insertionsites = range(start + 3, end, 3)
@@ -215,8 +218,8 @@ class DIMPLE:
         print("Initial Fragment Sizes for:" + self.geneid)
         print(fragsize)
 
-        total = DIMPLE.primerBuffer
-        breaksites = [DIMPLE.primerBuffer]
+        total = cfg.primer_buffer
+        breaksites = [cfg.primer_buffer]
 
         for x in fragsize:
             total += x
@@ -268,14 +271,15 @@ class DIMPLE:
 
     @breaksites.setter
     def breaksites(self, value):
+        cfg = self.pool.config
         if isinstance(value, list):
-            if any([(x - DIMPLE.primerBuffer) % 3 != 0 for x in value]):
+            if any([(x - cfg.primer_buffer) % 3 != 0 for x in value]):
                 raise ValueError("New Breaksites are not divisible by 3")
             if (
                 value[0] != self.breaksites[0] or value[-1] != self.breaksites[-1]
-            ) and not DIMPLE.dms:
-                if DIMPLE.non_interactive:
-                    if DIMPLE.breaksite_change_policy == "error":
+            ) and not cfg.dms:
+                if cfg.non_interactive:
+                    if cfg.breaksite_change_policy == "error":
                         raise ValueError(
                             "Beginning and end of gene changed during non-interactive run. "
                             "Set breaksite_change_policy to 'warn' to continue."

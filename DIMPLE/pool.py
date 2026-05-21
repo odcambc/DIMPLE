@@ -98,8 +98,8 @@ def addgene(genefile, config: Optional[DimpleRuntimeConfig] = None, start=None, 
 
         config = get_runtime_config()
     pool = Pool(config)
-    print("Barcode: " + str(DIMPLE.barcodeF[0].seq))
-    print("Number of barcodes: " + str(len(DIMPLE.barcodeF)))
+    print("Barcode: " + str(config.barcode_f[0].seq))
+    print("Number of barcodes: " + str(len(config.barcode_f)))
     if start is None:
         start = []
     if end is None:
@@ -114,10 +114,9 @@ def addgene(genefile, config: Optional[DimpleRuntimeConfig] = None, start=None, 
             logger.info("Found start: " + str(start) + " and end: " + str(end))
             logger.info("Inferred ORF sequence: " + str(gene.seq[start:end]))
             logger.info("ORF translation: " + str(gene.seq[start:end].translate()))
-            instance = DIMPLE(gene, start, end)
+            instance = DIMPLE(gene, start, end, pool)
         else:
             gene.filename = genefile.replace("\\", "")
-            instance = DIMPLE(gene, start, end)
-        instance.pool = pool
+            instance = DIMPLE(gene, start, end, pool)
         pool.append(instance)
     return pool
