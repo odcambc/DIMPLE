@@ -14,19 +14,13 @@ Pass --update-golden to regenerate the golden files instead of asserting.
 """
 
 import shutil
+from pathlib import Path
 
 import pytest
 from Bio.Seq import Seq
 
-from DIMPLE.DIMPLE import (
-    DIMPLE,
-    addgene,
-    generate_DMS_fragments,
-    post_qc,
-    print_all,
-)
-
-from pathlib import Path
+from DIMPLE.DIMPLE import addgene, generate_DMS_fragments, post_qc, print_all
+from DIMPLE.pool import DimpleRuntimeConfig
 
 EXPECTED = Path(__file__).parent.parent / "expected"
 
@@ -38,47 +32,45 @@ _GOLDEN_FILES = [
     "Kir_designed_variants.csv",
 ]
 
+_OVERLAP = 3
+
 
 @pytest.mark.slow
 def test_dms_pipeline_kir(tmp_path, dimple_human_usage, kir_fa, update_golden):
     """Full DMS pipeline on the Kir gene; byte-compares outputs to golden files."""
     gene_file = tmp_path / kir_fa.name
     shutil.copy(kir_fa, gene_file)
-
-    # Mirror the parameter setup from the original test / run_dimple.py.
-    # dimple_state (via dimple_human_usage) snapshots and restores all of these.
-    DIMPLE.handle = ""
-    DIMPLE.overlap = 3
-    DIMPLE.synth_len = 230          # shadows the property descriptor with a plain int
-    DIMPLE.maxfrag = DIMPLE.synth_len - 62 - DIMPLE.overlap  # 165
-    DIMPLE.primerBuffer += DIMPLE.overlap                     # 30 + 3 = 33
-
-    DIMPLE.dms = True
-    DIMPLE.stop_codon = True
-    DIMPLE.make_double = False
-    DIMPLE.maximize_nucleotide_change = False
-
-    restriction_sequence = "CGTCTC(G)1/5"
-    tmp_cutsite = restriction_sequence.split("(")
-    DIMPLE.cutsite = Seq(tmp_cutsite[0])
-    DIMPLE.cutsite_buffer = Seq(tmp_cutsite[1].split(")")[0])
-    tmp_overhang = tmp_cutsite[1].split(")")[1].split("/")
-    DIMPLE.cutsite_overhang = int(tmp_overhang[1]) - int(tmp_overhang[0])
-    DIMPLE.enzyme = None  # skip golden-gate assembly QC; doesn't affect output files
-
-    DIMPLE.avoid_sequence = [Seq(x) for x in ["CGTCTC", "GGTCTC"]]
-    DIMPLE.random_seed = 1848
-
     wDir = str(tmp_path) + "/"
-    pool = addgene(str(gene_file))
+
+    # Run configuration -- mirrors run_dimple.py for the Kir DMS scan.
+    # Restriction "CGTCTC(G)1/5": cutsite CGTCTC, buffer G, overhang 5 - 1 = 4.
+    config = DimpleRuntimeConfig(
+        handle="",
+        synth_len=230,
+        maxfrag=230 - 62 - _OVERLAP,        # 165
+        primer_buffer=30 + _OVERLAP,        # PRIMER_BUFFER_BASE + overlap = 33
+        dms=True,
+        stop_codon=True,
+        make_double=False,
+        maximize_nucleotide_change=False,
+        cutsite=Seq("CGTCTC"),
+        cutsite_buffer=Seq("G"),
+        cutsite_overhang=4,
+        enzyme=None,                        # skip golden-gate assembly QC
+        avoid_sequence=[Seq("CGTCTC"), Seq("GGTCTC")],
+        random_seed=1848,
+        usage=dimple_human_usage,
+    )
+
+    pool = addgene(str(gene_file), config)
 
     generate_DMS_fragments(
         pool,
-        DIMPLE.overlap,
-        DIMPLE.overlap,
+        _OVERLAP,
+        _OVERLAP,
         True,                                   # synonymous
         None,                                   # custom_mutations
-        DIMPLE.dms,
+        True,                                   # dms
         ["GAC", "GACCAT", "GACCATGTA"],         # insert
         [3, 6, 9],                              # delete
         False,                                  # dis

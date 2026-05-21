@@ -14,7 +14,8 @@ pipeline modules can depend on it without a cycle.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
 from typing import List, Optional
 
 from Bio import SeqIO
@@ -26,6 +27,18 @@ logger = logging.getLogger(__name__)
 
 # Base primer buffer before overlap extension (matches DIMPLE.primerBuffer default).
 PRIMER_BUFFER_BASE: int = 30
+
+# Bundled barcode primer sets, loaded once. Each DimpleRuntimeConfig gets its
+# own copy because barcodes are consumed (popped) as a run assigns subpools.
+_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+try:
+    _BARCODES_F = list(SeqIO.parse(os.path.join(_DATA_DIR, "forward_finalprimers.fasta"), "fasta"))
+    _BARCODES_R = list(SeqIO.parse(os.path.join(_DATA_DIR, "reverse_finalprimers.fasta"), "fasta"))
+except FileNotFoundError as exc:
+    raise ValueError(
+        "Could not find barcode files. Please upload your own or place standard "
+        "barcodes in the data file."
+    ) from exc
 
 
 @dataclass
@@ -43,8 +56,8 @@ class DimpleRuntimeConfig:
     primer_buffer: int = PRIMER_BUFFER_BASE
     random_seed: Optional[int] = 0
     avoid_sequence: Optional[List[Seq]] = None
-    barcode_f: Optional[list] = None
-    barcode_r: Optional[list] = None
+    barcode_f: list = field(default_factory=lambda: list(_BARCODES_F))
+    barcode_r: list = field(default_factory=lambda: list(_BARCODES_R))
     dms: bool = False
     stop_codon: bool = False
     make_double: bool = False

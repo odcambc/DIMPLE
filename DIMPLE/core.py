@@ -86,6 +86,9 @@ class DIMPLE:
                 cfg.synth_len - self.maxfrag_offset
             )  # based on space for barcodes, cut sites, handle. Doesn't need to be exact
             cfg.maxfrag = maxfrag
+        # Per-gene maxfrag: seeded from config, but switch_fragmentsize may
+        # decrement it per gene while resolving fragment-boundary conflicts.
+        self.maxfrag = maxfrag
 
         self.geneid = gene.name
         self.linked = set()
