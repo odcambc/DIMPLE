@@ -127,9 +127,9 @@ def run():
         app.output_text.insert(tk.END, "Error: Restriction sequence not recognized\n")
         raise ValueError(str(exc)) from exc
 
-    if DIMPLE.enzyme is not None:
-        app.output_text.insert(tk.END, f"Using restriction enzyme {DIMPLE.enzyme}\n")
-    app.output_text.insert(tk.END, f"Using restriction sequence {DIMPLE.cutsite}\n")
+    if runtime_config.enzyme is not None:
+        app.output_text.insert(tk.END, f"Using restriction enzyme {runtime_config.enzyme}\n")
+    app.output_text.insert(tk.END, f"Using restriction sequence {runtime_config.cutsite}\n")
 
     normalize_avoid_list(app.avoid_sequence.get(), logger=logger, config=runtime_config)
     apply_runtime_policies(

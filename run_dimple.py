@@ -288,7 +288,7 @@ if args.matchSequences == "match":
     align_genevariation(pool)
 if args.deletions:
     args.deletions = [int(x) for x in args.deletions]
-if not any([DIMPLE.dms, args.insertions, args.deletions]):
+if not any([runtime_config.dms, args.insertions, args.deletions]):
     raise ValueError("Didn't select any mutations to generate")
 
 if args.insertions:
@@ -302,7 +302,7 @@ generate_DMS_fragments(
     overlap_r,
     args.include_synonymous,
     custom_mutations,
-    DIMPLE.dms,
+    runtime_config.dms,
     args.insertions,
     args.deletions,
     args.dis,
