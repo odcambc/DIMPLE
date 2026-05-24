@@ -10,6 +10,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      - name: Verify uv.lock is in sync with pyproject.toml
+        run: uv lock --check
+
+      - name: Install dev tools
+        run: uv sync --extra dev
+
+      - name: ruff
+        run: uv run ruff check .
+
+      - name: black
+        run: uv run black --check .
+
+      - name: isort
+        run: uv run isort --check-only .
+
   pytest:
     strategy:
       fail-fast: false

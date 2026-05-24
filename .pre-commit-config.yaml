@@ -1,0 +1,37 @@
+# Pre-commit hooks. Install with `pre-commit install` (one-time per checkout).
+# Manual run across the repo: `pre-commit run --all-files`.
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.14
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+
+  - repo: https://github.com/psf/black
+    rev: 26.5.1
+    hooks:
+      - id: black
+        exclude: \.ipynb$
+
+  - repo: https://github.com/PyCQA/isort
+    rev: 8.0.1
+    hooks:
+      - id: isort
+        exclude: \.ipynb$
+
+  - repo: local
+    hooks:
+      - id: uv-lock-check
+        name: uv lock --check
+        entry: uv lock --check
+        language: system
+        files: ^(pyproject\.toml|uv\.lock)$
+        pass_filenames: false
+
+      - id: pytest-collect
+        name: pytest --collect-only
+        entry: python -m pytest --collect-only -q
+        language: system
+        types: [python]
+        pass_filenames: false
