@@ -19,19 +19,11 @@ from DIMPLE.DIMPLE import (
 )
 from DIMPLE.run_settings import (
     DEFAULT_GUI_RANDOM_SEED,
-    DimpleRuntimeConfig,
-    apply_barcode_start,
-    apply_handle,
     apply_instance_settings,
-    apply_random_seed,
-    apply_restriction_settings,
-    apply_runtime_policies,
-    compute_overlaps_and_maxfrag,
     configure_dimple_logging,
-    normalize_avoid_list,
-    resolve_codon_usage,
     validate_insertions,
 )
+from DIMPLE.runner import build_runtime_config
 from DIMPLE.utilities import parse_custom_mutations
 
 log_file = "logs/DIMPLE-{:%Y-%m-%d-%s}.log".format(datetime.now())
@@ -64,11 +56,8 @@ AMINO_ACIDS = [
 
 
 def run():
-    # A fresh DimpleRuntimeConfig is constructed every invocation, which gives
-    # this run its own barcode pool (config.barcode_f). Barcodes therefore reset
-    # between runs without any explicit teardown -- see upstream issue #21.
-    runtime_config = DimpleRuntimeConfig()
-    # Check that a mutation type is selected
+    # GUI-side validation: mutation type + gene file (clearer than letting
+    # build_runtime_config / run_pipeline raise; we want messageboxes).
     if not any(
         [
             app.delete.get(),
@@ -81,75 +70,18 @@ def run():
         messagebox.showerror("Python Error", "Error: You must select a mutation type.")
         raise ValueError("You must select a mutation type")
 
-    # Check if gene file is set
     if app.geneFile is None:
         app.output_text.insert(tk.END, "Error: No gene file selected.\n")
         messagebox.showerror("Python Error", "Error: No gene file selected.")
         raise ValueError("No gene file selected for input.")
 
-    # Set working dir from gene file if not set
     if app.wDir is None:
         app.wDir = app.geneFile.rsplit("/", 1)[0] + "/"
         app.output_text.insert(tk.END, f"Working directory set to {app.wDir}\n")
 
-    try:
-        apply_handle(app.handle.get(), config=runtime_config)
-    except ValueError as exc:
-        app.output_text.insert(tk.END, "Error: Genetic handle contains non-nucleic acid bases\n")
-        raise ValueError(str(exc)) from exc
-
-    deletions_for_overlap = False
+    # Parse mutation knobs from the form, emit the GUI-only frame-of-3 warnings.
+    deletions = False
     if app.delete.get():
-        deletions_for_overlap = [int(x) for x in app.deletions.get().split(",")]
-
-    frag_raw = app.fragmentLen.get().strip()
-    fragment_len = 0 if frag_raw == "" or frag_raw.lower() == "auto" else int(frag_raw)
-
-    overlap_l, overlap_r = compute_overlaps_and_maxfrag(
-        int(app.oligoLen.get()),
-        fragment_len,
-        int(app.overlap.get()),
-        deletions_for_overlap,
-        logger=logger,
-        config=runtime_config,
-    )
-
-    resolve_codon_usage(app.codon_usage, config=runtime_config)
-
-    apply_barcode_start(int(app.barcode_start.get()), config=runtime_config)
-
-    try:
-        apply_restriction_settings(app.restriction_sequence.get(), config=runtime_config)
-    except (ValueError, IndexError) as exc:
-        message = (
-            f"Restriction sequence {app.restriction_sequence.get()!r} is not valid. "
-            "Expected format like 'CGTCTC(G)1/5' or a named enzyme ('BsaI', 'BsmBI'). "
-            f"({exc})"
-        )
-        app.output_text.insert(tk.END, f"Error: {message}\n")
-        messagebox.showerror("Invalid Restriction Sequence", message)
-        return
-
-    if runtime_config.enzyme is not None:
-        app.output_text.insert(tk.END, f"Using restriction enzyme {runtime_config.enzyme}\n")
-    app.output_text.insert(tk.END, f"Using restriction sequence {runtime_config.cutsite}\n")
-
-    normalize_avoid_list(app.avoid_sequence.get(), logger=logger, config=runtime_config)
-    apply_runtime_policies(
-        dms=bool(app.include_substitutions.get()),
-        stop_codon=bool(app.stop.get()),
-        make_double=bool(app.make_double.get()),
-        maximize_nucleotide_change=bool(app.max_mutations.get()),
-        non_interactive=False,
-        preferred_orf_index=None,
-        link_policy="prompt",
-        breaksite_change_policy="prompt",
-        config=runtime_config,
-    )
-
-    if app.delete.get() == 0:
-        deletions = False
-    else:
         deletions = [int(x) for x in app.deletions.get().split(",")]
         if any(x % 3 != 0 for x in deletions):
             message = (
@@ -158,9 +90,9 @@ def run():
             )
             app.output_text.insert(tk.END, message + "\n")
             warnings.warn(message)
-    if app.insert.get() == 0:
-        insertions = False
-    else:
+
+    insertions = False
+    if app.insert.get():
         insertions = app.insertions.get().split(",")
         if any(len(x) % 3 != 0 for x in insertions):
             message = (
@@ -169,13 +101,52 @@ def run():
             )
             app.output_text.insert(tk.END, message + "\n")
             warnings.warn(message)
+
+    frag_raw = app.fragmentLen.get()
+    fragment_len = 0 if frag_raw.strip().lower() in ("", "auto") else int(frag_raw)
+
+    # Single helper call replaces the previous ~50-line config dance. Wrap in
+    # try/except so handle / restriction parse errors surface as messageboxes
+    # rather than tracebacks (matches the previous behaviour, just at coarser
+    # granularity — the error message itself names the offending field).
+    try:
+        runtime_config, overlap_l, overlap_r = build_runtime_config(
+            oligo_len=int(app.oligoLen.get()),
+            fragment_len=fragment_len,
+            overlap=int(app.overlap.get()),
+            handle=app.handle.get(),
+            restriction_sequence=app.restriction_sequence.get(),
+            avoid_sequence=app.avoid_sequence.get(),
+            codon_usage=app.codon_usage,
+            barcode_start=int(app.barcode_start.get()),
+            deletions=deletions,
+            dms=bool(app.include_substitutions.get()),
+            dis=bool(app.dis.get()),
+            make_double=bool(app.make_double.get()),
+            stop_codon=bool(app.stop.get()),
+            maximize_nucleotide_change=bool(app.max_mutations.get()),
+            non_interactive=False,
+            preferred_orf_index=None,
+            link_policy="prompt",
+            breaksite_change_policy="prompt",
+            random_seed=DEFAULT_GUI_RANDOM_SEED,
+            logger=logger,
+        )
+    except (ValueError, IndexError) as exc:
+        app.output_text.insert(tk.END, f"Error during config setup: {exc}\n")
+        messagebox.showerror("DIMPLE config error", str(exc))
+        raise
+
+    if insertions:
         try:
             validate_insertions(insertions, runtime_config)
         except ValueError as exc:
             app.output_text.insert(tk.END, f"Error: {exc}\n")
             raise
 
-    apply_random_seed(DEFAULT_GUI_RANDOM_SEED, config=runtime_config)
+    if runtime_config.enzyme is not None:
+        app.output_text.insert(tk.END, f"Using restriction enzyme {runtime_config.enzyme}\n")
+    app.output_text.insert(tk.END, f"Using restriction sequence {runtime_config.cutsite}\n")
 
     pool = addgene(app.geneFile, runtime_config)
 
@@ -215,24 +186,17 @@ def run():
         deletions,
         app.dis.get(),
         app.wDir,
+        config=runtime_config,
     )
 
     # Post QC checks and saving
     app.output_text.insert(tk.END, "Post QC checks and saving\n")
-    post_qc(pool)
-    print_all(pool, app.wDir)
+    post_qc(pool, config=runtime_config)
+    print_all(pool, app.wDir, config=runtime_config)
 
     logger.info("Finished")
-    app.output_text.insert(tk.END, "==========================================\n")
-    app.output_text.insert(tk.END, "DONE: DIMPLE run finished successfully.\n")
-    app.output_text.insert(tk.END, f"Output written to: {app.wDir}\n")
+    app.output_text.insert(tk.END, "Finished\n")
     app.output_text.insert(tk.END, f"Log file saved to {log_file}\n")
-    app.output_text.insert(tk.END, "==========================================\n")
-    app.output_text.see(tk.END)
-    messagebox.showinfo(
-        "DIMPLE",
-        f"DIMPLE run finished successfully.\n\nOutput written to:\n{app.wDir}",
-    )
 
     # Output all parameters to log
 
@@ -273,13 +237,9 @@ class Application(tk.Frame):
         self.oligoLen = tk.Entry(self, textvariable=tk.StringVar(self, "250"))
         self.oligoLen.pack()
 
-        tk.Label(self, text="Fragment Length ('auto' or integer)").pack()
         self.fragmentLen = tk.Entry(self, textvariable=tk.StringVar(self, "auto"))
-        self.fragmentLen.pack()
 
-        tk.Label(self, text="Overlap (bases)").pack()
         self.overlap = tk.Entry(self, textvariable=tk.StringVar(self, "4"))
-        self.overlap.pack()
 
         tk.Label(self, text="Barcode Start position (3000 total available)").pack()
         self.barcode_start = tk.Entry(self, textvariable=tk.StringVar(self, "0"))
