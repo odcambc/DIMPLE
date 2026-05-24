@@ -3,30 +3,10 @@
 
 import argparse
 import logging
-import os
 from datetime import datetime
 
-from DIMPLE.DIMPLE import (
-    addgene,
-    align_genevariation,
-    generate_DMS_fragments,
-    post_qc,
-    print_all,
-)
-from DIMPLE.run_settings import (
-    DimpleRuntimeConfig,
-    apply_barcode_start,
-    apply_handle,
-    apply_instance_settings,
-    apply_random_seed,
-    apply_restriction_settings,
-    apply_runtime_policies,
-    compute_overlaps_and_maxfrag,
-    configure_dimple_logging,
-    normalize_avoid_list,
-    resolve_codon_usage,
-    validate_insertions,
-)
+from DIMPLE.run_settings import configure_dimple_logging
+from DIMPLE.runner import build_runtime_config, run_pipeline
 from DIMPLE.utilities import parse_custom_mutations
 
 log_file = "logs/DIMPLE-{:%Y-%m-%d-%s}.log".format(datetime.now())
@@ -223,84 +203,51 @@ if args.wDir is None:
     else:
         args.wDir = ""
 
-runtime_config = DimpleRuntimeConfig()
+if args.custom_mutations:
+    with open(args.custom_mutations, encoding="utf-8") as f:
+        custom_mutations = parse_custom_mutations(f.readlines())
+else:
+    custom_mutations = None
 
-apply_handle(args.handle, config=runtime_config)
-
-deletions_for_overlap = args.deletions if args.deletions else False
-overlap_l, overlap_r = compute_overlaps_and_maxfrag(
-    args.oligoLen,
-    args.fragmentLen,
-    args.overlap,
-    deletions_for_overlap,
-    logger=logger,
-    config=runtime_config,
-)
-
-apply_barcode_start(int(args.barcode_start), config=runtime_config)
-
-apply_restriction_settings(args.restriction_sequence, config=runtime_config)
-
-normalize_avoid_list(args.avoid_sequence, logger=logger, config=runtime_config)
+deletions = [int(x) for x in args.deletions] if args.deletions else False
 
 link_policy = "never" if args.non_interactive and args.link_policy == "prompt" else args.link_policy
-apply_runtime_policies(
+
+runtime_config, overlap_l, overlap_r = build_runtime_config(
+    oligo_len=args.oligoLen,
+    fragment_len=args.fragmentLen,
+    overlap=args.overlap,
+    handle=args.handle,
+    restriction_sequence=args.restriction_sequence,
+    avoid_sequence=args.avoid_sequence,
+    codon_usage=args.usage,
+    barcode_start=int(args.barcode_start),
+    deletions=deletions,
     dms=args.DMS,
-    stop_codon=args.include_stop_codons,
+    dis=bool(args.dis),
     make_double=args.make_double,
+    stop_codon=args.include_stop_codons,
     maximize_nucleotide_change=args.maximize_nucleotide_change,
     non_interactive=args.non_interactive,
     preferred_orf_index=args.orf_index,
     link_policy=link_policy,
     breaksite_change_policy=args.breaksite_change_policy,
-    config=runtime_config,
+    random_seed=int(args.seed) if args.seed else None,
+    logger=logger,
 )
 
-if args.custom_mutations:
-    with open(args.custom_mutations, encoding="utf-8") as f:
-        custom_mutations = f.readlines()
-    custom_mutations = parse_custom_mutations(custom_mutations)
-else:
-    custom_mutations = None
-
-if args.seed:
-    apply_random_seed(int(args.seed), config=runtime_config)
-else:
-    apply_random_seed(None, config=runtime_config)
-
-resolve_codon_usage(args.usage, config=runtime_config)
-
-pool = addgene(os.path.join(args.wDir, args.geneFile).strip(), runtime_config)
-
-apply_instance_settings(pool, config=runtime_config)
-
-if args.matchSequences == "match":
-    align_genevariation(pool)
-if args.deletions:
-    args.deletions = [int(x) for x in args.deletions]
-if not any([runtime_config.dms, args.insertions, args.deletions]):
-    raise ValueError("Didn't select any mutations to generate")
-
-if args.insertions:
-    validate_insertions(list(args.insertions), runtime_config)
-
-logger.info("Generating DMS fragments")
-
-generate_DMS_fragments(
-    pool,
+run_pipeline(
+    args.geneFile,
+    args.wDir,
+    runtime_config,
     overlap_l,
     overlap_r,
-    args.include_synonymous,
-    custom_mutations,
-    runtime_config.dms,
-    args.insertions,
-    args.deletions,
-    args.dis,
-    args.wDir,
-    config=runtime_config,
+    include_synonymous=args.include_synonymous,
+    custom_mutations=custom_mutations,
+    insertions=args.insertions,
+    deletions=deletions,
+    dis=args.dis,
+    match_sequences=args.matchSequences == "match",
 )
-
-post_qc(pool, config=runtime_config)
-print_all(pool, args.wDir, config=runtime_config)
 
 logger.info("Finished")
