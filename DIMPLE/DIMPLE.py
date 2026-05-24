@@ -38,6 +38,23 @@ from DIMPLE.pool import DimpleRuntimeConfig, Pool, addgene
 
 logger = logging.getLogger(__name__)
 
+
+def _aa_number(codon_pos: int, frag_start: int, offset: int, primer_buffer: int) -> int:
+    """Convert a codon position inside ``tmpseq`` to a 1-indexed AA number.
+
+    ``tmpseq`` is sliced from ``gene.seq[frag[0] - offset : ...]``, and ``gene.seq``
+    already skips the start codon (``core.py`` slices at ``start + 3``). With the
+    canonical configuration ``gene.seq[primer_buffer]`` is therefore the AA 2
+    codon, so the ``+ 6`` shift maps ``codon_pos == offset`` (first mutable codon
+    of a fragment that starts at ``primer_buffer``) onto AA 2.
+
+    Used by the substitution and deletion paths to label mutations; also by the
+    make_double pair-lookup, which extracts the AA number from a mutation name
+    and indexes into a precomputed ``positions`` list — both must agree.
+    """
+    return (frag_start + codon_pos + 6 - offset - primer_buffer) // 3
+
+
 # Public API. `DIMPLE/DIMPLE.py` re-exports module-split helpers so existing
 # `from DIMPLE.DIMPLE import ...` callers keep working. Listed here so ruff F401
 # doesn't strip them as unused.
@@ -479,8 +496,13 @@ def generate_DMS_fragments(
                     positions = [tmp_positions[i] for i, x in tmp_mut_positions]
                 else:
                     mut_positions = range(offset, offset + frag[1] - frag[0], 3)
+                    # Must use the same formula as the mutation-name AA number below,
+                    # since the make_double pair lookup extracts that number from a
+                    # mutation name and indexes into `positions`. Before 2026-05-23
+                    # this used `+ 3` while names used `+ 6`, raising ValueError on
+                    # the last AA of every fragment.
                     positions = [
-                        int((frag[0] + x + 3 - offset - pool.config.primer_buffer) / 3)
+                        _aa_number(x, frag[0], offset, pool.config.primer_buffer)
                         for x in mut_positions
                     ]
                 ### Deep Mutational Scanning
@@ -488,6 +510,7 @@ def generate_DMS_fragments(
                     mutations = {}
                     for i in mut_positions:
                         wt_codon = tmpseq[i : i + 3].upper()
+                        aa_pos = _aa_number(i, frag[0], offset, pool.config.primer_buffer)
                         wt = [
                             name
                             for name, codon in gene.SynonymousCodons.items()
@@ -641,49 +664,20 @@ def generate_DMS_fragments(
                                             f"substitution fragment: {str(xfrag)}"
                                         )
                                         break
-                                mutations[
-                                    ">"
-                                    + wt[0]
-                                    + str(
-                                        int(
-                                            (frag[0] + i + 6 - offset - pool.config.primer_buffer)
-                                            / 3
-                                        )
-                                    )
-                                    + jk
-                                ] = mutation[0]
+                                mutations[">" + wt[0] + str(aa_pos) + jk] = mutation[0]
                                 # if there was a synonymous mutation added then add the
                                 # synonymous mutation to the mutation list
                                 if synonymous_mutation:
-                                    mutations[
-                                        ">"
-                                        + wt[0]
-                                        + str(
-                                            int(
-                                                (
-                                                    frag[0]
-                                                    + i
-                                                    + 6
-                                                    - offset
-                                                    - pool.config.primer_buffer
-                                                )
-                                                / 3
-                                            )
-                                        )
-                                        + jk
-                                    ] += (str(synonymous_position) + "_" + synonymous_mutation[0])
+                                    mutations[">" + wt[0] + str(aa_pos) + jk] += (
+                                        str(synonymous_position) + "_" + synonymous_mutation[0]
+                                    )
                                 oligo_id = (
                                     gene.geneid
                                     + "_DMS-"
                                     + str(idx + 1)
                                     + "_"
                                     + wt[0]
-                                    + str(
-                                        int(
-                                            (frag[0] + i + 6 - offset - pool.config.primer_buffer)
-                                            / 3
-                                        )
-                                    )
+                                    + str(aa_pos)
                                     + jk
                                 )
                                 dms_sequences.append(
@@ -699,15 +693,10 @@ def generate_DMS_fragments(
                                     mutation_type = "X"
                                 else:
                                     mutation_type = "M"
-                                aa_pos = int(
-                                    (frag[0] + i + 6 - offset - pool.config.primer_buffer) / 3
-                                )
                                 name = f"{seq1(wt[0])}{aa_pos}{seq1(jk)}"
                                 gene.designed_variants[oligo_id] = {
                                     "count": 0,
-                                    "pos": int(
-                                        (frag[0] + i + 6 - offset - pool.config.primer_buffer) / 3
-                                    ),
+                                    "pos": aa_pos,
                                     "mutation_type": mutation_type,
                                     "name": name,
                                     "codon": mutation[0],
@@ -738,19 +727,46 @@ def generate_DMS_fragments(
                                             + mutations[combi[1]]
                                             + tmpseq[pos2 + 3 :]
                                         )
+                                        double_name = (
+                                            combi[0].strip(">") + "+" + combi[1].strip(">")
+                                        )
+                                        double_oligo_id = (
+                                            gene.geneid + "_DMS-" + str(idx + 1) + "_" + double_name
+                                        )
                                         dms_sequences_double.append(
                                             SeqRecord(
                                                 xfrag,
-                                                id=gene.geneid
-                                                + "_DMS-"
-                                                + str(idx + 1)
-                                                + "_"
-                                                + combi[0].strip(">")
-                                                + "+"
-                                                + combi[1].strip(">"),
+                                                id=double_oligo_id,
                                                 description="Frag " + fragstart + "-" + fragend,
                                             )
                                         )
+                                        # Register the double in designed_variants so the
+                                        # shared barcode-assembly loop can stamp the final
+                                        # oligo sequence onto it (same shape as the singles
+                                        # block at ~line 696 and the DIS registration fix).
+                                        gene.designed_variants[double_oligo_id] = {
+                                            "count": 0,
+                                            "pos": _aa_number(
+                                                pos1, frag[0], offset, pool.config.primer_buffer
+                                            ),
+                                            "mutation_type": "MM",
+                                            "name": double_name,
+                                            "codon": (
+                                                str(mutations[combi[0]])
+                                                + "+"
+                                                + str(mutations[combi[1]])
+                                            ),
+                                            "wt_codon": (
+                                                str(tmpseq[pos1 : pos1 + 3]).upper()
+                                                + "+"
+                                                + str(tmpseq[pos2 : pos2 + 3]).upper()
+                                            ),
+                                            "mutation": double_name,
+                                            "length": 2,
+                                            "hgvs": f"p.([{double_name}])",
+                                            "fragment": idx + 1,
+                                            "xfrag": xfrag,
+                                        }
                     # record mutation for analysis with NGS
                     # TODO: Don't append.
                     with open(
@@ -865,7 +881,7 @@ def generate_DMS_fragments(
                     # binding region
                     for i in range(offset - 3, offset + frag[1] - frag[0] - 3, 3):
                         # Calculate the amino acid position too
-                        pos = int((frag[0] + i + 6 - offset - pool.config.primer_buffer) / 3)
+                        pos = _aa_number(i, frag[0], offset, pool.config.primer_buffer)
                         # List of wt codons for each position in the range of deletion lengths
                         wt_codons = [
                             tmpseq[i + j : i + j + 3].upper() for j in range(0, max(delete), 3)
