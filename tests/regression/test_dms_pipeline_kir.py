@@ -47,8 +47,8 @@ def test_dms_pipeline_kir(tmp_path, dimple_human_usage, kir_fa, update_golden):
     config = DimpleRuntimeConfig(
         handle="",
         synth_len=230,
-        maxfrag=230 - 62 - _OVERLAP,        # 165
-        primer_buffer=30 + _OVERLAP,        # PRIMER_BUFFER_BASE + overlap = 33
+        maxfrag=230 - 62 - _OVERLAP,  # 165
+        primer_buffer=30 + _OVERLAP,  # PRIMER_BUFFER_BASE + overlap = 33
         dms=True,
         stop_codon=True,
         make_double=False,
@@ -56,7 +56,7 @@ def test_dms_pipeline_kir(tmp_path, dimple_human_usage, kir_fa, update_golden):
         cutsite=Seq("CGTCTC"),
         cutsite_buffer=Seq("G"),
         cutsite_overhang=4,
-        enzyme=None,                        # skip golden-gate assembly QC
+        enzyme=None,  # skip golden-gate assembly QC
         avoid_sequence=[Seq("CGTCTC"), Seq("GGTCTC")],
         random_seed=1848,
         usage=dimple_human_usage,
@@ -68,12 +68,12 @@ def test_dms_pipeline_kir(tmp_path, dimple_human_usage, kir_fa, update_golden):
         pool,
         _OVERLAP,
         _OVERLAP,
-        True,                                   # synonymous
-        None,                                   # custom_mutations
-        True,                                   # dms
-        ["GAC", "GACCAT", "GACCATGTA"],         # insert
-        [3, 6, 9],                              # delete
-        False,                                  # dis
+        True,  # synonymous
+        None,  # custom_mutations
+        True,  # dms
+        ["GAC", "GACCAT", "GACCATGTA"],  # insert
+        [3, 6, 9],  # delete
+        False,  # dis
         wDir,
     )
     post_qc(pool)

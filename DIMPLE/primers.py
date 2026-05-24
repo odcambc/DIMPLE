@@ -29,8 +29,8 @@ def find_geneprimer(genefrag, start, end, pool):
     while primer.complement()[end - start + comp] == genefrag[end + comp]:
         comp += 1
     # comp += 1 # This is important for single basepair overhang
-    tm2 = mt.Tm_NN(primer[0: end - start + comp], nn_table=mt.DNA_NN2)
-    tm4 = mt.Tm_NN(primer[0: end - start + comp], nn_table=mt.DNA_NN4)
+    tm2 = mt.Tm_NN(primer[0 : end - start + comp], nn_table=mt.DNA_NN2)
+    tm4 = mt.Tm_NN(primer[0 : end - start + comp], nn_table=mt.DNA_NN4)
     count = 0
     while (
         tm2 < cfg.gene_primer_tm[0]
@@ -43,8 +43,8 @@ def find_geneprimer(genefrag, start, end, pool):
             primer = (
                 genefrag[start:end].complement() + cfg.cutsite[::-1] + "ATA"
             )  # cut site addition
-            tm2 = mt.Tm_NN(primer[0: end - start + comp], nn_table=mt.DNA_NN2)
-            tm4 = mt.Tm_NN(primer[0: end - start + comp], nn_table=mt.DNA_NN4)
+            tm2 = mt.Tm_NN(primer[0 : end - start + comp], nn_table=mt.DNA_NN2)
+            tm4 = mt.Tm_NN(primer[0 : end - start + comp], nn_table=mt.DNA_NN4)
         if (
             count > 12 or start == 0
         ):  # stop if caught in inf loop or if linker is at max (31 + 7 = 38 bases)
@@ -53,8 +53,8 @@ def find_geneprimer(genefrag, start, end, pool):
             start += 1
             primer = genefrag[start:end].complement() + cfg.cutsite[::-1] + "ATA"
             # tm = mt.Tm_NN(primer[0:e-s+comp],c_seq=genefrag[s:e+comp],nn_table=mt.DNA_NN2)
-            tm2 = mt.Tm_NN(primer[0: end - start + comp], nn_table=mt.DNA_NN2)
-            tm4 = mt.Tm_NN(primer[0: end - start + comp], nn_table=mt.DNA_NN4)
+            tm2 = mt.Tm_NN(primer[0 : end - start + comp], nn_table=mt.DNA_NN2)
+            tm4 = mt.Tm_NN(primer[0 : end - start + comp], nn_table=mt.DNA_NN4)
         count += 1
     # optional - force first nucleotide to a C or G
     # while primer[0]=="T" or primer[0]=="A" or primer[0]=="t" or primer[0]=="a":
@@ -122,9 +122,7 @@ def check_nonspecific(primer, fragment, point):
     # Forward
     for i in range(len(fragment) - len(primer)):  # Scan each position
         # first check if the primer binds at each position in the fragment
-        match = [
-            primer[j].lower() == fragment[i + j].lower() for j in range(len(primer))
-        ]
+        match = [primer[j].lower() == fragment[i + j].lower() for j in range(len(primer))]
         first = 10
         for k in range(len(match) - 3):
             if (match[k] and match[k + 1] and match[k + 3]) or (
@@ -153,29 +151,22 @@ def check_nonspecific(primer, fragment, point):
                 )
                 if melt > 25:
                     print("Found non-specific match at " + str(i + 1) + "bp:")
-                    print("match: " + fragment[i: i + len(primer)])
+                    print("match: " + fragment[i : i + len(primer)])
                     print("primer:" + primer + " Tm:" + str(round(melt, 1)))
                     logger.warning("Found non-specific match at " + str(i + 1) + "bp:")
-                    logger.warning("match: " + fragment[i: i + len(primer)])
+                    logger.warning("match: " + fragment[i : i + len(primer)])
                     logger.warning("primer:" + primer + " Tm:" + str(round(melt, 1)))
                 if melt > 35:
                     non.append(True)
             except ValueError as valerr:
-                print(
-                    str(valerr)
-                    + ". Please check position manually:"
-                    + str(i + 1)
-                    + " forward"
-                )
+                print(str(valerr) + ". Please check position manually:" + str(i + 1) + " forward")
                 print("Primer:" + primer)
                 print("Match: " + fragment[i : i + len(primer)])
                 non.append(False)
     # Reverse
     fragment = fragment.reverse_complement()
     for i in range(len(fragment) - len(primer)):
-        match = [
-            primer[j].lower() == fragment[i + j].lower() for j in range(len(primer))
-        ]
+        match = [primer[j].lower() == fragment[i + j].lower() for j in range(len(primer))]
         first = 10
         for k in range(0, len(match) - 3, 1):
             if match[k] and match[k + 1] and match[k + 3]:
@@ -202,12 +193,7 @@ def check_nonspecific(primer, fragment, point):
                 if melt > 35:
                     non.append(True)
             except ValueError as valerr:
-                print(
-                    str(valerr)
-                    + ". Please check position manually:"
-                    + str(i + 1)
-                    + " reverse"
-                )
+                print(str(valerr) + ". Please check position manually:" + str(i + 1) + " reverse")
                 print("Primer:" + primer)
                 print("Match: " + fragment[i : i + len(primer)])
                 non.append(False)

@@ -60,20 +60,18 @@ def test_dis_pipeline_kir(tmp_path, dimple_human_usage, kir_fa):
         pool,
         _OVERLAP,
         _OVERLAP,
-        True,    # synonymous
-        None,    # custom_mutations
-        False,   # dms
-        False,   # insert
-        False,   # delete
-        True,    # dis
+        True,  # synonymous
+        None,  # custom_mutations
+        False,  # dms
+        False,  # insert
+        False,  # delete
+        True,  # dis
         wDir,
     )
 
     gene = pool[0]
     # The crash being guarded: designed_variants is populated for DIS.
-    dis_variants = {
-        k: v for k, v in gene.designed_variants.items() if "_DIS-" in k
-    }
+    dis_variants = {k: v for k, v in gene.designed_variants.items() if "_DIS-" in k}
     assert dis_variants, "DIS run produced no designed_variants entries"
 
     # Every emitted oligo must have a registered variant carrying its sequence.

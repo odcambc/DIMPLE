@@ -27,9 +27,5 @@ def print_all(pool, folder="", config=None):
         except AttributeError:
             print(obj.geneid + " has not been processed")
     # Remove redundant sequences?
-    SeqIO.write(
-        alloligos, os.path.join(folder.replace("\\", ""), "All_Oligos.fasta"), "fasta"
-    )
-    SeqIO.write(
-        allprimers, os.path.join(folder.replace("\\", ""), "All_Primers.fasta"), "fasta"
-    )
+    SeqIO.write(alloligos, os.path.join(folder.replace("\\", ""), "All_Oligos.fasta"), "fasta")
+    SeqIO.write(allprimers, os.path.join(folder.replace("\\", ""), "All_Primers.fasta"), "fasta")

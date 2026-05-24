@@ -6,11 +6,9 @@ These tests verify:
      looping indefinitely — this is the main regression guard.
 """
 
-import pytest
 from Bio.Seq import Seq
 
 from DIMPLE.DIMPLE import DIMPLE, find_fragment_primer
-
 
 # 25-nt sequence with ~50% GC — Tm_NN should land close to the primerTm window.
 _BALANCED_25MER = Seq("ATCGATCGATCGATCGATCGATCGA")
@@ -41,9 +39,7 @@ class TestFindFragmentPrimerNormal:
         """
         lo, hi = DIMPLE.primerTm
         primer, tm = find_fragment_primer(_BALANCED_25MER, stop=25)
-        assert lo - 2 <= tm <= hi + 2, (
-            f"Tm {tm:.2f} °C is well outside primerTm window {lo}–{hi}"
-        )
+        assert lo - 2 <= tm <= hi + 2, f"Tm {tm:.2f} °C is well outside primerTm window {lo}–{hi}"
 
 
 class TestFindFragmentPrimerAdversarial:

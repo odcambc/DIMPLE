@@ -22,7 +22,7 @@ from typing import List, Optional, Union
 
 from Bio.Seq import Seq
 
-from DIMPLE.pool import DimpleRuntimeConfig, PRIMER_BUFFER_BASE
+from DIMPLE.pool import PRIMER_BUFFER_BASE, DimpleRuntimeConfig
 from DIMPLE.utilities import codon_usage
 
 # Default GUI random seed (matches historical GUI behavior and tests).
@@ -59,9 +59,7 @@ def apply_handle(handle: str, config: DimpleRuntimeConfig) -> None:
     config.handle = handle
 
 
-_VALID_CODONS = frozenset(
-    a + b + c for a in "ACGT" for b in "ACGT" for c in "ACGT"
-)
+_VALID_CODONS = frozenset(a + b + c for a in "ACGT" for b in "ACGT" for c in "ACGT")
 
 
 def _validate_usage_table(table, source: str) -> None:
@@ -79,25 +77,19 @@ def _validate_usage_table(table, source: str) -> None:
             parts.append(f"missing codons: {sorted(missing)}")
         if extra:
             parts.append(f"unrecognized keys: {sorted(extra)}")
-        raise ValueError(
-            f"Codon usage from {source} is malformed: {'; '.join(parts)}."
-        )
+        raise ValueError(f"Codon usage from {source} is malformed: {'; '.join(parts)}.")
     for codon, freq in table.items():
         if not isinstance(freq, (int, float)) or isinstance(freq, bool):
             raise ValueError(
-                f"Codon usage from {source}: value for {codon!r} is not a number "
-                f"({freq!r})."
+                f"Codon usage from {source}: value for {codon!r} is not a number " f"({freq!r})."
             )
         if not 0 <= freq <= 1:
             raise ValueError(
-                f"Codon usage from {source}: value for {codon!r} ({freq}) is "
-                "outside [0, 1]."
+                f"Codon usage from {source}: value for {codon!r} ({freq}) is " "outside [0, 1]."
             )
 
 
-def resolve_codon_usage(
-    usage_arg: Union[str, dict], config: DimpleRuntimeConfig
-) -> dict:
+def resolve_codon_usage(usage_arg: Union[str, dict], config: DimpleRuntimeConfig) -> dict:
     """Resolve codon usage and assign it to ``config.usage``.
 
     * ``"ecoli"`` / ``"human"``: built-in tables via :func:`codon_usage`.
@@ -131,9 +123,7 @@ def resolve_codon_usage(
     return config.usage
 
 
-def apply_restriction_settings(
-    restriction_sequence: str, config: DimpleRuntimeConfig
-) -> None:
+def apply_restriction_settings(restriction_sequence: str, config: DimpleRuntimeConfig) -> None:
     """Parse a restriction enzyme / site string into ``config``'s cutsite fields."""
     if re.match(r"[ACGT]+\([ACGT]\)\d+/\d+", restriction_sequence):
         tmp_cutsite = restriction_sequence.split("(")
@@ -168,8 +158,7 @@ def apply_restriction_settings(
             config.enzyme = "BsmBI"
     else:
         raise ValueError(
-            f"Restriction sequence {restriction_sequence!r} not recognized. "
-            "Please check input."
+            f"Restriction sequence {restriction_sequence!r} not recognized. " "Please check input."
         )
 
 
@@ -278,9 +267,7 @@ def validate_insertions(insertions: List[str], config: DimpleRuntimeConfig) -> N
     cutsite_str = str(config.cutsite)
     for insertion in insertions:
         if any(b not in "ACGTacgt" for b in insertion):
-            raise ValueError(
-                f"Insertions contain non-nucleic acid bases: {insertions!r}"
-            )
+            raise ValueError(f"Insertions contain non-nucleic acid bases: {insertions!r}")
         if cutsite_str in insertion:
             raise ValueError(
                 f"Insertions contain restriction sites ({cutsite_str}): {insertions!r}"

@@ -1,1 +1,1 @@
-from DIMPLE import DIMPLE
+from DIMPLE import DIMPLE as DIMPLE

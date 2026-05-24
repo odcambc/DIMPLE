@@ -8,8 +8,8 @@ from unittest.mock import patch
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
-from DIMPLE.DIMPLE import DIMPLE, post_qc, check_final_assembly
-from DIMPLE.pool import Pool, DimpleRuntimeConfig
+from DIMPLE.DIMPLE import DIMPLE, check_final_assembly, post_qc
+from DIMPLE.pool import DimpleRuntimeConfig, Pool
 
 
 class TestQCPaths(unittest.TestCase):

@@ -101,7 +101,7 @@ class DIMPLE:
             "Trp",
             "Val",
             "Glu",
-            "Tyr"
+            "Tyr",
         ]
         if cfg.stop_codon:
             self.aminoacids.append("STOP")
@@ -109,13 +109,11 @@ class DIMPLE:
 
         self.designed_variants = {}
 
-
         # First check for unwanted cutsites (BsaI sites and BsmBI sites)
         match_sites = [
-                gene.seq.upper().count(cut)
-                + gene.seq.upper().count(cut.reverse_complement())
-                for cut in cfg.avoid_sequence
-            ]
+            gene.seq.upper().count(cut) + gene.seq.upper().count(cut.reverse_complement())
+            for cut in cfg.avoid_sequence
+        ]
         if any(match_sites):
             raise ValueError(
                 "Unwanted Restriction cut sites found. Please input plasmids with these removed."
@@ -130,8 +128,12 @@ class DIMPLE:
             logger.info("Start: " + str(start) + " End: " + str(end))
             logger.info("ORF length: " + str(end - start))
             if (end - start) % 3 != 0:
-                print("Gene length is not divisible by 3. Resetting and attempting to identify ORF.")
-                logger.warning("Gene length is not divisible by 3. Resetting and attempting to identify ORF.")
+                print(
+                    "Gene length is not divisible by 3. Resetting and attempting to identify ORF."
+                )
+                logger.warning(
+                    "Gene length is not divisible by 3. Resetting and attempting to identify ORF."
+                )
                 start = None
                 end = None
         if start is None or end is None:
@@ -149,20 +151,19 @@ class DIMPLE:
         logger.info("Using the following ORF positions:")
         logger.info("Start: " + str(start) + " End: " + str(end))
 
-
-        # record sequence with extra bp to account for primer. for plasmids (circular) we can rearrange linear sequence)
+        # record sequence with extra bp to account for primer. for plasmids (circular)
+        # we can rearrange linear sequence)
         if start - cfg.primer_buffer < 0:
             self.seq = (
-                gene.seq[start + 3 - cfg.primer_buffer:]
-                + gene.seq[: end + cfg.primer_buffer]
+                gene.seq[start + 3 - cfg.primer_buffer :] + gene.seq[: end + cfg.primer_buffer]
             )
         elif end + cfg.primer_buffer > len(gene.seq):
             self.seq = (
-                gene.seq[start + 3 - cfg.primer_buffer:]
+                gene.seq[start + 3 - cfg.primer_buffer :]
                 + gene.seq[: end + cfg.primer_buffer - len(gene.seq)]
             )
         else:
-            self.seq = gene.seq[start + 3 - cfg.primer_buffer: end + cfg.primer_buffer]
+            self.seq = gene.seq[start + 3 - cfg.primer_buffer : end + cfg.primer_buffer]
         self.seq = self.seq.upper()
 
         # Determine Fragment Size and store beginning and end of each fragment
@@ -192,7 +193,6 @@ class DIMPLE:
         self.fragsize = fragsize
         self.__breaksites = breaksites
 
-
     # Update Breaksites
     @property
     def breaksites(self):
@@ -204,9 +204,7 @@ class DIMPLE:
         if isinstance(value, list):
             if any([(x - cfg.primer_buffer) % 3 != 0 for x in value]):
                 raise ValueError("New Breaksites are not divisible by 3")
-            if (
-                value[0] != self.breaksites[0] or value[-1] != self.breaksites[-1]
-            ) and not cfg.dms:
+            if (value[0] != self.breaksites[0] or value[-1] != self.breaksites[-1]) and not cfg.dms:
                 if cfg.non_interactive:
                     if cfg.breaksite_change_policy == "error":
                         raise ValueError(
@@ -219,7 +217,8 @@ class DIMPLE:
                 else:
                     if (
                         input(
-                            "Beginning and End of gene have changed. Are you sure you want to continue? (y/n)"
+                            "Beginning and End of gene have changed. "
+                            "Are you sure you want to continue? (y/n)"
                         )
                         != "y"
                     ):

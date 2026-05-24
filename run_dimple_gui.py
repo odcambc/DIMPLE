@@ -1,8 +1,15 @@
 # RUN DIMPLE
 # script for GUI
 
+import ast
+import logging
+import tkinter as tk
+import warnings
+from datetime import datetime
+from io import StringIO
+from tkinter import filedialog, messagebox
+
 from DIMPLE.DIMPLE import (
-    DIMPLE,
     addgene,
     align_genevariation,
     generate_DMS_fragments,
@@ -11,30 +18,21 @@ from DIMPLE.DIMPLE import (
     switch_fragmentsize,
 )
 from DIMPLE.run_settings import (
+    DEFAULT_GUI_RANDOM_SEED,
+    DimpleRuntimeConfig,
     apply_barcode_start,
     apply_handle,
     apply_instance_settings,
     apply_random_seed,
-    apply_runtime_policies,
     apply_restriction_settings,
+    apply_runtime_policies,
     compute_overlaps_and_maxfrag,
     configure_dimple_logging,
-    DEFAULT_GUI_RANDOM_SEED,
-    DimpleRuntimeConfig,
     normalize_avoid_list,
     resolve_codon_usage,
     validate_insertions,
 )
 from DIMPLE.utilities import parse_custom_mutations
-import ast
-from datetime import datetime
-from io import StringIO
-import logging
-import os
-import tkinter as tk
-import warnings
-from tkinter import filedialog
-from tkinter import messagebox
 
 log_file = "logs/DIMPLE-{:%Y-%m-%d-%s}.log".format(datetime.now())
 configure_dimple_logging(log_file)
@@ -94,16 +92,12 @@ def run():
     try:
         apply_handle(app.handle.get(), config=runtime_config)
     except ValueError as exc:
-        app.output_text.insert(
-            tk.END, "Error: Genetic handle contains non-nucleic acid bases\n"
-        )
+        app.output_text.insert(tk.END, "Error: Genetic handle contains non-nucleic acid bases\n")
         raise ValueError(str(exc)) from exc
 
     deletions_for_overlap = False
     if app.delete.get():
-        deletions_for_overlap = [
-            int(x) for x in app.deletions.get().split(",")
-        ]
+        deletions_for_overlap = [int(x) for x in app.deletions.get().split(",")]
 
     frag_raw = app.fragmentLen.get()
     fragment_len = 0 if frag_raw == "auto" else int(frag_raw)
@@ -190,9 +184,7 @@ def run():
         pool[0].problemsites = set(int(x) for x in app.custom_mutations.keys())
         # add extras
         if app.avoid_others_list.get() != "":
-            pool[0].problemsites.update(
-                [int(x) for x in app.avoid_others_list.get().split(",")]
-            )
+            pool[0].problemsites.update([int(x) for x in app.avoid_others_list.get().split(",")])
         for i in range(len(pool[0].breaksites)):
             switch_fragmentsize(pool[0], 1, pool)
 
@@ -229,7 +221,6 @@ def run():
     # Output all parameters to log
 
 
-
 class Application(tk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
@@ -238,9 +229,7 @@ class Application(tk.Frame):
         self.create_widgets()
 
     def create_widgets(self):
-        self.winfo_toplevel().title(
-            "DIMPLE Deep Indel Missense Programmable Library Engineering"
-        )
+        self.winfo_toplevel().title("DIMPLE Deep Indel Missense Programmable Library Engineering")
         self.matchSequences = tk.IntVar()
         self.mutationType = tk.IntVar()
         self.usage = tk.IntVar()
@@ -256,15 +245,11 @@ class Application(tk.Frame):
         self.avoid_breaksites = tk.IntVar()
         self.max_mutations = tk.IntVar()
 
-        self.wDir_file = tk.Button(
-            self, text="Working Directory", command=self.browse_wDir
-        )
+        self.wDir_file = tk.Button(self, text="Working Directory", command=self.browse_wDir)
         self.wDir_file.pack()
         self.wDir = None
 
-        self.gene_file = tk.Button(
-            self, text="Target Gene File", command=self.browse_gene
-        )
+        self.gene_file = tk.Button(self, text="Target Gene File", command=self.browse_gene)
         self.gene_file.pack()
         self.geneFile = None
 
@@ -284,9 +269,7 @@ class Application(tk.Frame):
         self.melting_temp_high = tk.Entry(self, textvariable=tk.StringVar(self, "62"))
 
         tk.Label(self, text="Type IIS restriction sequence (Do not use N)").pack()
-        self.restriction_sequence = tk.Entry(
-            self, textvariable=tk.StringVar(self, "CGTCTC(G)1/5")
-        )
+        self.restriction_sequence = tk.Entry(self, textvariable=tk.StringVar(self, "CGTCTC(G)1/5"))
         self.restriction_sequence.pack()
 
         tk.Label(self, text="Sequences to avoid").pack()
@@ -295,9 +278,7 @@ class Application(tk.Frame):
         )
         self.avoid_sequence.pack()
 
-        self.stop_codon = tk.Checkbutton(
-            self, text="Include Stop Codons", variable=self.stop
-        )
+        self.stop_codon = tk.Checkbutton(self, text="Include Stop Codons", variable=self.stop)
         self.stop_codon.pack()
 
         self.synonymous_check = tk.Checkbutton(
@@ -394,9 +375,7 @@ class Application(tk.Frame):
 
             def on_closing():
                 # set codon usage
-                self.codon_usage = ast.literal_eval(
-                    custom_codon.get("1.0", "end-1c").strip()
-                )
+                self.codon_usage = ast.literal_eval(custom_codon.get("1.0", "end-1c").strip())
                 newWindow.destroy()
 
             newWindow.protocol("WM_DELETE_WINDOW", on_closing)
@@ -416,37 +395,25 @@ class Application(tk.Frame):
             self, text="Human", variable=self.usage, value=0, command=human_ON
         )
         self.human_check.pack()
-        self.custom_codon_button = tk.Button(
-            self, text="Custom Codon Usage", command=openNewWindow
-        )
+        self.custom_codon_button = tk.Button(self, text="Custom Codon Usage", command=openNewWindow)
         self.custom_codon_button.pack()
 
-        tk.Label(self, text="Select Mutations", font="helvetica 12 underline").pack(
-            pady=5
-        )
+        tk.Label(self, text="Select Mutations", font="helvetica 12 underline").pack(pady=5)
 
-        self.include_dis = tk.Checkbutton(
-            self, text="Domain Insertion Scan", variable=self.dis
-        )
+        self.include_dis = tk.Checkbutton(self, text="Domain Insertion Scan", variable=self.dis)
         self.include_dis.pack()
         self.handle = tk.Entry(
             self, width=50, textvariable=tk.StringVar(self, "AGCGGGAGACCGGGGTCTCTGAGC")
         )
         self.handle.pack()
 
-        self.delete_check = tk.Checkbutton(
-            self, text="List of Deletions", variable=self.delete
-        )
+        self.delete_check = tk.Checkbutton(self, text="List of Deletions", variable=self.delete)
         self.delete_check.pack()
         self.delete_check.deselect()
-        self.deletions = tk.Entry(
-            self, width=50, textvariable=tk.StringVar(self, "3,6")
-        )
+        self.deletions = tk.Entry(self, width=50, textvariable=tk.StringVar(self, "3,6"))
         self.deletions.pack()
 
-        self.insert_check = tk.Checkbutton(
-            self, text="List of Insertions", variable=self.insert
-        )
+        self.insert_check = tk.Checkbutton(self, text="List of Insertions", variable=self.insert)
         self.insert_check.pack()
         self.insert_check.deselect()
         self.insertions = tk.Entry(
@@ -499,7 +466,8 @@ class Application(tk.Frame):
 
         self.avoid_others_list = ""
 
-        # self.matchSequences_check = tk.Checkbutton(self, text='Match Sequences', variable=self.matchSequences)
+        # self.matchSequences_check = tk.Checkbutton(
+        #     self, text='Match Sequences', variable=self.matchSequences)
         # self.matchSequences_check.pack()
 
         self.run = tk.Button(self, text="Run DIMPLE", command=run).pack(pady=10)
@@ -514,9 +482,7 @@ class Application(tk.Frame):
         self.output_text.pack(side="left", fill="both", expand=True)
 
         # Create the vertical scrollbar
-        scrollbar = tk.Scrollbar(
-            output_frame, orient="vertical", command=self.output_text.yview
-        )
+        scrollbar = tk.Scrollbar(output_frame, orient="vertical", command=self.output_text.yview)
         scrollbar.pack(side="right", fill="y")
 
         # Link the scrollbar to the Text widget
@@ -525,9 +491,7 @@ class Application(tk.Frame):
     def browse_wDir(self):
         self.wDir = filedialog.askdirectory(title="Select a File")
         if self.wDir != "":
-            self.wDir_file.config(
-                bg="green", activebackground="green", relief=tk.SUNKEN
-            )
+            self.wDir_file.config(bg="green", activebackground="green", relief=tk.SUNKEN)
             self.output_text.insert(tk.END, f"Working directory set to {self.wDir}\n")
         else:
             self.wDir = None
@@ -535,9 +499,7 @@ class Application(tk.Frame):
     def browse_gene(self):
         self.geneFile = filedialog.askopenfilename(title="Select a File")
         if self.geneFile != "":
-            self.gene_file.config(
-                bg="green", activebackground="green", relief=tk.SUNKEN
-            )
+            self.gene_file.config(bg="green", activebackground="green", relief=tk.SUNKEN)
             self.output_text.insert(tk.END, f"Gene file set to {self.geneFile}\n")
         else:
             self.geneFile = None
@@ -565,16 +527,12 @@ class Application(tk.Frame):
         # create a button to set custom mutations
         def on_closing():
             # set custom mutations
-            mutation_text = (
-                custom_mutations_window.get("1.0", "end-1c").strip().split("\n")
-            )
+            mutation_text = custom_mutations_window.get("1.0", "end-1c").strip().split("\n")
             self.custom_mutations = parse_custom_mutations(mutation_text[1:])
             newWindow.destroy()
 
         newWindow.protocol("WM_DELETE_WINDOW", on_closing)
-        self.custom_mutations_button.config(
-            bg="green", activebackground="green", relief=tk.SUNKEN
-        )
+        self.custom_mutations_button.config(bg="green", activebackground="green", relief=tk.SUNKEN)
         self.include_substitutions.set(1)
 
 

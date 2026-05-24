@@ -2,14 +2,11 @@
 # script for usage with command line
 
 import argparse
+import logging
 import os
-import warnings
 from datetime import datetime
 
-import logging
-
 from DIMPLE.DIMPLE import (
-    DIMPLE,
     addgene,
     align_genevariation,
     generate_DMS_fragments,
@@ -17,15 +14,15 @@ from DIMPLE.DIMPLE import (
     print_all,
 )
 from DIMPLE.run_settings import (
+    DimpleRuntimeConfig,
     apply_barcode_start,
     apply_handle,
     apply_instance_settings,
     apply_random_seed,
-    apply_runtime_policies,
     apply_restriction_settings,
+    apply_runtime_policies,
     compute_overlaps_and_maxfrag,
     configure_dimple_logging,
-    DimpleRuntimeConfig,
     normalize_avoid_list,
     resolve_codon_usage,
     validate_insertions,
@@ -150,9 +147,7 @@ parser.add_argument(
 parser.add_argument(
     "-restriction_sequence",
     default="CGTCTC(G)1/5",
-    help=(
-        "Recommended using BsmBI - CGTCTC(G)1/5 or BsaI - GGTCTC(G)1/5. Do not use N"
-    ),
+    help=("Recommended using BsmBI - CGTCTC(G)1/5 or BsaI - GGTCTC(G)1/5. Do not use N"),
 )
 parser.add_argument(
     "-avoid_sequence",
@@ -186,10 +181,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "-maximize_nucleotide_change",
-    help=(
-        "Maximize the number of nucleotide changes in each codon for easier "
-        "detection in NGS"
-    ),
+    help=("Maximize the number of nucleotide changes in each codon for easier " "detection in NGS"),
     default=False,
     const=True,
     action="store_const",
@@ -251,9 +243,7 @@ apply_restriction_settings(args.restriction_sequence, config=runtime_config)
 
 normalize_avoid_list(args.avoid_sequence, logger=logger, config=runtime_config)
 
-link_policy = (
-    "never" if args.non_interactive and args.link_policy == "prompt" else args.link_policy
-)
+link_policy = "never" if args.non_interactive and args.link_policy == "prompt" else args.link_policy
 apply_runtime_policies(
     dms=args.DMS,
     stop_codon=args.include_stop_codons,
