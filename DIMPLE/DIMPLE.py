@@ -134,12 +134,12 @@ def align_genevariation(pool):
                 for xsite in range(0, max_gene_len + pool.config.primer_buffer + 1, 3)
                 if xsite not in problemsites
             ]
-            breaksites = [(
+            breaksites = [
                 site
                 if site in available_sites
                 else min(available_sites, key=lambda x: abs(x - site))
                 for site in breaksites
-            )]  # remove problemsites?
+            ]  # remove problemsites?
             if any(x < DIMPLE.minfrag or x > pool.config.maxfrag for x in fragsize):
                 print(fragsize)
                 raise ValueError(

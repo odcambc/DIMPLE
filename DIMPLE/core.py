@@ -193,37 +193,6 @@ class DIMPLE:
         self.__breaksites = breaksites
 
 
-    def ochre(self):
-        if len(self.SynonymousCodons["STOP"]) < 2:
-            raise Exception("You have removed all stop codons")
-        self.usage_ecoli["TAG"] = 1
-        self.usage_human["TAG"] = 1
-        # SynonymousCodons['STOP'] = ['TGA','TAA']
-        del self.SynonymousCodons["STOP"][0]
-        self.SynonymousCodons["OCHRE"] = ["TAG"]
-        self.aminoacids.extend("OCHRE")
-
-    def amber(self):
-        if len(self.SynonymousCodons["STOP"]) < 2:
-            raise Exception("You have removed all stop codons")
-        self.usage_ecoli["TAA"] = 1
-        self.usage_human["TAA"] = 1
-        del self.SynonymousCodons["STOP"][2]
-        self.SynonymousCodons["AMBER"] = ["TAA"]
-        self.aminoacids.extend("AMBER")
-
-    def opal(self):
-        if len(self.SynonymousCodons["STOP"]) < 2:
-            raise Exception("You have removed all stop codons")
-        self.usage_ecoli["TGA"] = 1
-        self.usage_human["TGA"] = 1
-        del self.SynonymousCodons["STOP"][1]
-        self.SynonymousCodons["OPAL"] = ["TGA"]
-        self.aminoacids.extend("OPAL")
-
-    def __getitem__(self):
-        return
-
     # Update Breaksites
     @property
     def breaksites(self):

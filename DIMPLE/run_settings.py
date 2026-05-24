@@ -59,26 +59,75 @@ def apply_handle(handle: str, config: DimpleRuntimeConfig) -> None:
     config.handle = handle
 
 
+_VALID_CODONS = frozenset(
+    a + b + c for a in "ACGT" for b in "ACGT" for c in "ACGT"
+)
+
+
+def _validate_usage_table(table, source: str) -> None:
+    """Raise ``ValueError`` if *table* is not a dict of all 64 codons in [0, 1]."""
+    if not isinstance(table, dict):
+        raise ValueError(
+            f"Codon usage from {source} must be a dict of 64 codons; "
+            f"got {type(table).__name__}."
+        )
+    missing = _VALID_CODONS - table.keys()
+    extra = table.keys() - _VALID_CODONS
+    if missing or extra:
+        parts = []
+        if missing:
+            parts.append(f"missing codons: {sorted(missing)}")
+        if extra:
+            parts.append(f"unrecognized keys: {sorted(extra)}")
+        raise ValueError(
+            f"Codon usage from {source} is malformed: {'; '.join(parts)}."
+        )
+    for codon, freq in table.items():
+        if not isinstance(freq, (int, float)) or isinstance(freq, bool):
+            raise ValueError(
+                f"Codon usage from {source}: value for {codon!r} is not a number "
+                f"({freq!r})."
+            )
+        if not 0 <= freq <= 1:
+            raise ValueError(
+                f"Codon usage from {source}: value for {codon!r} ({freq}) is "
+                "outside [0, 1]."
+            )
+
+
 def resolve_codon_usage(
     usage_arg: Union[str, dict], config: DimpleRuntimeConfig
 ) -> dict:
     """Resolve codon usage and assign it to ``config.usage``.
 
     * ``"ecoli"`` / ``"human"``: built-in tables via :func:`codon_usage`.
-    * Path string (any other str): file contents ``ast.literal_eval`` to a dict.
     * ``dict``: used directly (e.g. GUI custom table).
+    * Path string (any other str): the file must exist; its contents are
+      ``ast.literal_eval``'d to a dict.
+
+    The resolved table is validated (64 codons present, all values numeric in
+    ``[0, 1]``) before being assigned to ``config.usage``.
 
     Returns:
         The resolved codon usage table.
     """
     if isinstance(usage_arg, dict):
         config.usage = usage_arg
+        source = "<custom dict>"
     elif usage_arg in ("ecoli", "human"):
         config.usage = codon_usage(usage_arg)
+        source = f"built-in {usage_arg!r}"
     else:
+        if not os.path.exists(usage_arg):
+            raise ValueError(
+                f"Codon usage {usage_arg!r}: not a built-in preset and no file "
+                "exists at that path. Did you mean 'ecoli' or 'human'?"
+            )
         with open(usage_arg, encoding="utf-8") as f:
             text = f.read()
         config.usage = ast.literal_eval(text.strip())
+        source = f"file {usage_arg!r}"
+    _validate_usage_table(config.usage, source)
     return config.usage
 
 

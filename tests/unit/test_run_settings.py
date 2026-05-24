@@ -62,13 +62,14 @@ class TestRunSettings(unittest.TestCase):
         self.assertEqual(cfg.usage["TTT"], 0.45)
 
     def test_resolve_codon_usage_dict(self) -> None:
-        custom = {"TTT": 0.5, "TTC": 0.5}
+        # Use the human preset as a known-valid 64-codon table.
+        custom = dict(codon_usage("human"))
         cfg = DimpleRuntimeConfig()
         resolve_codon_usage(custom, cfg)
         self.assertIs(cfg.usage, custom)
 
     def test_resolve_codon_usage_from_file(self) -> None:
-        table = {"TTT": 0.11, "TTC": 0.89}
+        table = dict(codon_usage("ecoli"))
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".txt", delete=False, encoding="utf-8"
         ) as f:
@@ -77,10 +78,38 @@ class TestRunSettings(unittest.TestCase):
         try:
             cfg = DimpleRuntimeConfig()
             resolve_codon_usage(path, cfg)
-            self.assertEqual(cfg.usage["TTT"], 0.11)
-            self.assertEqual(cfg.usage["TTC"], 0.89)
+            self.assertEqual(cfg.usage["TTT"], 0.58)
+            self.assertEqual(cfg.usage["ATG"], 1.0)
         finally:
             os.unlink(path)
+
+    def test_resolve_codon_usage_rejects_incomplete_dict(self) -> None:
+        cfg = DimpleRuntimeConfig()
+        with self.assertRaises(ValueError) as ctx:
+            resolve_codon_usage({"TTT": 0.5, "TTC": 0.5}, cfg)
+        self.assertIn("missing codons", str(ctx.exception).lower())
+
+    def test_resolve_codon_usage_rejects_out_of_range_freq(self) -> None:
+        bad = dict(codon_usage("human"))
+        bad["TTT"] = 1.5
+        cfg = DimpleRuntimeConfig()
+        with self.assertRaises(ValueError) as ctx:
+            resolve_codon_usage(bad, cfg)
+        self.assertIn("outside [0, 1]", str(ctx.exception))
+
+    def test_resolve_codon_usage_typo_preset_hint(self) -> None:
+        cfg = DimpleRuntimeConfig()
+        with self.assertRaises(ValueError) as ctx:
+            resolve_codon_usage("humn", cfg)
+        msg = str(ctx.exception).lower()
+        self.assertIn("did you mean", msg)
+        self.assertIn("ecoli", msg)
+
+    def test_resolve_codon_usage_missing_file_hint(self) -> None:
+        cfg = DimpleRuntimeConfig()
+        with self.assertRaises(ValueError) as ctx:
+            resolve_codon_usage("/nonexistent/path/codon_table.txt", cfg)
+        self.assertIn("no file exists", str(ctx.exception).lower())
 
     def test_apply_restriction_settings_pattern_bsmbi(self) -> None:
         cfg = DimpleRuntimeConfig()

@@ -395,7 +395,7 @@ class Application(tk.Frame):
             def on_closing():
                 # set codon usage
                 self.codon_usage = ast.literal_eval(
-                    custom_codon.get("1.0", "end-1c").strip("\n")
+                    custom_codon.get("1.0", "end-1c").strip()
                 )
                 newWindow.destroy()
 
