@@ -1354,23 +1354,24 @@ def generate_DMS_fragments(
         # from tabulate import tabulate
         # print('Missing Double Mutation Table:')
         # print(tabulate(missingTable))
-        # Fragments
+        # Fragments. fasta-2line emits header+sequence-on-one-line so oligo-ordering
+        # vendors don't have to undo Biopython's default 60-char wrap. Closes #19.
         SeqIO.write(
             gene.oligos,
             os.path.join(folder.replace("\\", ""), gene.geneid + "_DMS_Oligos.fasta"),
-            "fasta",
+            "fasta-2line",
         )
         # Barcode Primers
         SeqIO.write(
             gene.barPrimer,
             os.path.join(folder.replace("\\", ""), gene.geneid + "_DMS_Oligo_Primers.fasta"),
-            "fasta",
+            "fasta-2line",
         )
         # Amplification Primers
         SeqIO.write(
             gene.genePrimer,
             os.path.join(folder.replace("\\", ""), gene.geneid + "_DMS_Gene_Primers.fasta"),
-            "fasta",
+            "fasta-2line",
         )
 
         # Designed Variants
