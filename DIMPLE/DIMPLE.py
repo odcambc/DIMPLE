@@ -1121,7 +1121,13 @@ def generate_DMS_fragments(
                         for (
                             sequence
                         ) in dms_sequence_list:  # add barcodes to the fragments to make the oligos
-                            if insert or delete:
+                            # Per-sequence trim path is required whenever the list can hold
+                            # variable-length entries: insert/delete vary by definition; dis
+                            # inserts a handle so its sequences are longer than concurrent
+                            # DMS substitutions in the same list. The else-branch's blind
+                            # concat only stays at synth_len when every sequence matches the
+                            # smallest_frag the barcodes were sized for.
+                            if insert or delete or dis:
                                 cutsite_overhang = pool.config.cutsite_overhang
                                 difference = (
                                     pool.config.synth_len
