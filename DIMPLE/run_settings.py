@@ -194,7 +194,19 @@ def compute_overlaps_and_maxfrag(
                 overlap,
             )
 
-    config.primer_buffer = PRIMER_BUFFER_BASE + overlap_l
+    # The gene primer is taken from ``genefrag[15:primer_buffer + 1 - overlap_r]``;
+    # if ``overlap_r`` is large (long deletions inflate it by ``max(deletions) - 3``)
+    # that slice can collapse to empty and the primer-design loop walks off the
+    # end of the sequence (upstream issue #23). Grow ``primer_buffer`` to keep
+    # the gene-primer window at least ``GENE_PRIMER_MIN_WINDOW`` bases wide. The
+    # grow only triggers when ``overlap_r`` would otherwise crash the math, so
+    # existing goldens (small deletions, where ``overlap_r`` already fits) are
+    # unaffected. ``gene.seq`` extends by the same amount, but AA positions
+    # are computed as ``frag_pos - primer_buffer`` and so stay invariant.
+    GENE_PRIMER_START = 15
+    GENE_PRIMER_MIN_WINDOW = 1
+    required_buffer = overlap_r + GENE_PRIMER_START + GENE_PRIMER_MIN_WINDOW - 1
+    config.primer_buffer = max(PRIMER_BUFFER_BASE + overlap_l, required_buffer)
     return overlap_l, overlap_r
 
 
