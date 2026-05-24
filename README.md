@@ -36,7 +36,7 @@ Run commands in the environment:
 ```{bash}
 uv run python run_dimple.py -h
 uv run python run_dimple_gui.py
-uv run python -m unittest discover
+uv run pytest
 ```
 
 #### Using Conda (alternative)
@@ -170,9 +170,9 @@ Example output files are located in the `examples` directory.
 To test DIMPLE, run the following command from the root directory:
 
   ```{bash}
-uv run python -m unittest discover
+uv run pytest
 # or, without uv:
-python -m unittest discover
+pytest
 ```
 
 This should pass without any errors. If you encounter any issues, please open an issue on the GitHub repository.
