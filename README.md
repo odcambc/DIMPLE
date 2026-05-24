@@ -81,6 +81,32 @@ ATGTT...
 
 The start position should be the first base of the first codon, and the end position should be the last base of the last codon. Otherwise specify the ORF in the command line.
 
+### Headless / non-interactive runs
+
+DIMPLE auto-detects ORFs by scanning all six reading frames and looking for stretches longer than 100 amino acids. In an interactive run this prompts the user to pick one. **Headless runs (Colab, CI, `run_dimple.py --non_interactive`, automation pipelines) cannot prompt**, so you must disambiguate the ORF up-front in one of two ways:
+
+1. **Embed `start:` and `end:` in the FASTA header** (recommended — eliminates ambiguity entirely; ORF auto-detection is skipped):
+
+   ```{text}
+   >gene1 start:10 end:100
+   ATGTT...
+   ```
+
+2. **Pass `--non_interactive --orf_index N`** to `run_dimple.py` to pick the Nth detected ORF, where `N` is 1-based:
+
+   ```{bash}
+   uv run python run_dimple.py -geneFile gene.fa -DMS \
+       --non_interactive --orf_index 1
+   ```
+
+If neither is provided and `--non_interactive` is set, DIMPLE raises a clear `ValueError` rather than hanging on a prompt:
+
+- *No ORF candidates found* → no ≥100-aa frame matched. Add explicit `start:`/`end:` header.
+- *Multiple ORF candidates found* → multiple ≥100-aa frames matched. Add `start:`/`end:` header or `--orf_index N`.
+- *Preferred ORF index N is out of range* → `--orf_index` value larger than the detected count.
+
+The Colab notebook defaults to `non_interactive=True` and exposes `orf_index` as a form field for the same reason.
+
 # Running DIMPLE
 
 ## Colab version
