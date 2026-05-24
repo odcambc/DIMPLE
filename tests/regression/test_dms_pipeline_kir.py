@@ -30,6 +30,11 @@ _GOLDEN_FILES = [
     "Kir_DMS_Oligos.fasta",
     "Kir_mutations.csv",
     "Kir_designed_variants.csv",
+    # Aggregated outputs from print_all. For single-gene runs these are
+    # concatenations of the per-gene fastas above; guarding them catches
+    # regressions in the cross-gene aggregation logic too.
+    "All_Oligos.fasta",
+    "All_Primers.fasta",
 ]
 
 _OVERLAP = 3
