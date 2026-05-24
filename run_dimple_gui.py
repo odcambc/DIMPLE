@@ -64,6 +64,9 @@ AMINO_ACIDS = [
 
 
 def run():
+    # A fresh DimpleRuntimeConfig is constructed every invocation, which gives
+    # this run its own barcode pool (config.barcode_f). Barcodes therefore reset
+    # between runs without any explicit teardown -- see upstream issue #21.
     runtime_config = DimpleRuntimeConfig()
     # Check that a mutation type is selected
     if not any(
@@ -99,8 +102,8 @@ def run():
     if app.delete.get():
         deletions_for_overlap = [int(x) for x in app.deletions.get().split(",")]
 
-    frag_raw = app.fragmentLen.get()
-    fragment_len = 0 if frag_raw == "auto" else int(frag_raw)
+    frag_raw = app.fragmentLen.get().strip()
+    fragment_len = 0 if frag_raw == "" or frag_raw.lower() == "auto" else int(frag_raw)
 
     overlap_l, overlap_r = compute_overlaps_and_maxfrag(
         int(app.oligoLen.get()),
@@ -117,9 +120,15 @@ def run():
 
     try:
         apply_restriction_settings(app.restriction_sequence.get(), config=runtime_config)
-    except ValueError as exc:
-        app.output_text.insert(tk.END, "Error: Restriction sequence not recognized\n")
-        raise ValueError(str(exc)) from exc
+    except (ValueError, IndexError) as exc:
+        message = (
+            f"Restriction sequence {app.restriction_sequence.get()!r} is not valid. "
+            "Expected format like 'CGTCTC(G)1/5' or a named enzyme ('BsaI', 'BsmBI'). "
+            f"({exc})"
+        )
+        app.output_text.insert(tk.END, f"Error: {message}\n")
+        messagebox.showerror("Invalid Restriction Sequence", message)
+        return
 
     if runtime_config.enzyme is not None:
         app.output_text.insert(tk.END, f"Using restriction enzyme {runtime_config.enzyme}\n")
@@ -215,8 +224,16 @@ def run():
     print_all(pool, app.wDir, config=runtime_config)
 
     logger.info("Finished")
-    app.output_text.insert(tk.END, "Finished\n")
+    app.output_text.insert(tk.END, "==========================================\n")
+    app.output_text.insert(tk.END, "DONE: DIMPLE run finished successfully.\n")
+    app.output_text.insert(tk.END, f"Output written to: {app.wDir}\n")
     app.output_text.insert(tk.END, f"Log file saved to {log_file}\n")
+    app.output_text.insert(tk.END, "==========================================\n")
+    app.output_text.see(tk.END)
+    messagebox.showinfo(
+        "DIMPLE",
+        f"DIMPLE run finished successfully.\n\nOutput written to:\n{app.wDir}",
+    )
 
     # Output all parameters to log
 
@@ -257,9 +274,13 @@ class Application(tk.Frame):
         self.oligoLen = tk.Entry(self, textvariable=tk.StringVar(self, "250"))
         self.oligoLen.pack()
 
+        tk.Label(self, text="Fragment Length ('auto' or integer)").pack()
         self.fragmentLen = tk.Entry(self, textvariable=tk.StringVar(self, "auto"))
+        self.fragmentLen.pack()
 
+        tk.Label(self, text="Overlap (bases)").pack()
         self.overlap = tk.Entry(self, textvariable=tk.StringVar(self, "4"))
+        self.overlap.pack()
 
         tk.Label(self, text="Barcode Start position (3000 total available)").pack()
         self.barcode_start = tk.Entry(self, textvariable=tk.StringVar(self, "0"))
