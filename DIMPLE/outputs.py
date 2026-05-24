@@ -13,7 +13,7 @@ from Bio import SeqIO
 from DIMPLE.core import DIMPLE
 
 
-def print_all(pool, folder="", config=None):
+def print_all(pool, folder=""):
     """Writes oligos and primers to files."""
     if not isinstance(pool[0], DIMPLE):
         raise TypeError("Not an instance of the DIMPLE class")

@@ -297,10 +297,9 @@ generate_DMS_fragments(
     args.deletions,
     args.dis,
     args.wDir,
-    config=runtime_config,
 )
 
-post_qc(pool, config=runtime_config)
-print_all(pool, args.wDir, config=runtime_config)
+post_qc(pool)
+print_all(pool, args.wDir)
 
 logger.info("Finished")

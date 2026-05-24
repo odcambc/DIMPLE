@@ -215,13 +215,12 @@ def run():
         deletions,
         app.dis.get(),
         app.wDir,
-        config=runtime_config,
     )
 
     # Post QC checks and saving
     app.output_text.insert(tk.END, "Post QC checks and saving\n")
-    post_qc(pool, config=runtime_config)
-    print_all(pool, app.wDir, config=runtime_config)
+    post_qc(pool)
+    print_all(pool, app.wDir)
 
     logger.info("Finished")
     app.output_text.insert(tk.END, "==========================================\n")
