@@ -19,7 +19,7 @@ from DIMPLE.core import DIMPLE
 logger = logging.getLogger(__name__)
 
 
-def post_qc(pool, config=None):
+def post_qc(pool):
     logger.info("Running post QC")
     if not isinstance(pool[0], DIMPLE):
         raise TypeError("Not an instance of the DIMPLE class")
@@ -151,7 +151,7 @@ def post_qc(pool, config=None):
         print("No non-specific primers detected")
 
 
-def check_final_assembly(gene, config=None):
+def check_final_assembly(gene):
     """Test that each oligo assembles properly and contains the designed mutation."""
 
     cfg = gene.pool.config

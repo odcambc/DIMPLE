@@ -238,7 +238,6 @@ def generate_DMS_fragments(
     delete=False,
     dis=False,
     folder="",
-    config=None,
 ):
     """Generates the mutagenic oligos and writes the output to files."""
 
