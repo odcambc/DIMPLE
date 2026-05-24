@@ -1,4 +1,6 @@
 ### Python ###
+.venv/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -21,7 +23,9 @@ ipython_config.py
 
 
 ### VisualStudioCode ###
-.vscode/
+# Use `.vscode/*`, NOT `.vscode/`: git never descends into an ignored
+# *directory*, so with `.vscode/` the `!` un-ignore lines below would be dead.
+# `.vscode/*` ignores the contents while still allowing specific files back in.
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json

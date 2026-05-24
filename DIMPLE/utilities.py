@@ -1,54 +1,3 @@
-from Bio import SeqIO, Align
-
-def find_mutations(oligo_file, wt_file, typeII_RE, typeII_RE_R, RE_gap=6):
-    #typeII_RE = 'CGTCTC'  # I am using BsmbI
-    #typeII_RE_R = 'GAGACG'
-    wt_seq = next(SeqIO.parse(wt_file.replace("\\", ""), "fasta")).seq  # coding sequencing only
-    mutations = []
-    with open(oligo_file, 'r') as file:
-        row = next(file)
-        name = row.split('_')[-1].strip()
-        mutations.append('>'+name)
-        for row in file:
-            full_row = ''
-            while '>' != row[0]:
-                full_row += row.strip()
-                try:
-                    row = next(file)
-                except:
-                    break
-            if full_row == '':
-                break
-            #codon = ''.join([x for x in name if x.isdigit()])
-            tmp_split = full_row.strip().split(typeII_RE)[1][RE_gap:]  # minimum of 5 bases
-            row_split = tmp_split.split(typeII_RE_R)[0][:-RE_gap]
-            aligner = Align.PairwiseAligner()
-            aligner.mode = "local"
-            aligner.match_score = 2
-            aligner.mismatch_score = 0
-            aligner.open_gap_score = -10
-            aligner.extend_gap_score = -10
-            alignments = aligner.align(row_split, wt_seq)
-            for alignment in alignments:
-                break
-            #start = len(s)-len(s.lstrip('-'))
-            start = alignment.aligned[0][0][0]
-            remainder = start % 3
-            oligo_start = remainder
-            for codon in range(oligo_start, len(row_split), 3):
-                if row_split[codon:codon+3] != wt_seq[start+codon:start+codon+3]:
-                    mutations.append(row_split[codon:codon+3])
-            if '>' in row:
-                name = row.split('_')[-1].strip()
-                mutations.append('>'+name)
-
-    with open(r"test_mutations.csv", 'w') as file:
-        for mut in mutations:
-            file.write(mut+'\n')
-
-    return mutations
-
-
 def parse_custom_mutations(mutation_text):
     custom_mutations = {}
     for set in mutation_text:
@@ -100,7 +49,7 @@ def codon_usage(usage):
     return usage_table
 
 
-def findORF(gene):
+def findORF(gene, non_interactive=False, preferred_orf_index=None):
     # Scan through all strands and frames for open reading frames
     min_protein_len = 100  # Support for finding gene position in vector
     genestart = []
@@ -129,47 +78,72 @@ def findORF(gene):
                                 frame + 1,
                             )
                         )
+    if not genestart:
+        raise ValueError(
+            f"No valid ORF candidates found for {gene.name}. "
+            "Provide explicit start/end coordinates in the FASTA header."
+        )
+
     # Select Gene Frame
-    while True:
-        try:
-            genenum = int(
-                input("Which ORF are you targeting? (number):")
-            )  # userinput
-            if genestrand[genenum - 1] == -1:
-                gene.seq = gene.seq.reverse_complement()
-        except:
-            print("Please enter number")
-            continue
+    if non_interactive:
+        if preferred_orf_index is not None:
+            genenum = int(preferred_orf_index)
+            if genenum < 1 or genenum > len(genestart):
+                raise ValueError(
+                    f"Preferred ORF index {genenum} is out of range for {gene.name}. "
+                    f"Found {len(genestart)} ORF candidates."
+                )
+        elif len(genestart) == 1:
+            genenum = 1
         else:
-            break
+            raise ValueError(
+                f"Multiple ORF candidates found for {gene.name}. "
+                "Use FASTA header start/end or provide an explicit ORF index."
+            )
+        if genestrand[genenum - 1] == -1:
+            gene.seq = gene.seq.reverse_complement()
+    else:
+        while True:
+            try:
+                genenum = int(
+                    input("Which ORF are you targeting? (number):")
+                )  # userinput
+                if genestrand[genenum - 1] == -1:
+                    gene.seq = gene.seq.reverse_complement()
+            except:
+                print("Please enter number")
+                continue
+            else:
+                break
     start = genestart[genenum - 1] - 1  # subtract 1 to account for 0 indexing
     end = geneend[genenum - 1]
-    print(gene.seq[start:end].translate()[:10])
-    quest = "g"  # holding place
-
-    while quest != "n" and quest != "y":
-        quest = input(
-            "Is this the beginning of your gene?(position %i) (y/n):" % (start)
-        )
-    while quest == "n":
-        start = int(input("Enter the starting position your gene:"))
+    if not non_interactive:
         print(gene.seq[start:end].translate()[:10])
-        quest = input(
-            "Is this the beginning of your gene?(position %i) (y/n):" % (start)
-        )
-    print(gene.seq[start:end].translate()[-10:])
-    quest = "g"
-    while quest != "n" and quest != "y":
-        quest = input("Is the size of your gene %ibp? (y/n):" % (end - start))
-    while quest == "n":
-        try:
-            end = int(input("Enter nucleotide length of your gene:")) + start
-            if (end - start) % 3 != 0:
-                print("Length is not divisible by 3")
-                continue
-            print(gene.seq[start:end].translate()[-10:])
-            quest = input("Is this end correct? (y/n):")
-        except:
-            print("Please enter a number")
-            quest = "n"
+        quest = "g"  # holding place
+
+        while quest != "n" and quest != "y":
+            quest = input(
+                "Is this the beginning of your gene?(position %i) (y/n):" % (start)
+            )
+        while quest == "n":
+            start = int(input("Enter the starting position your gene:"))
+            print(gene.seq[start:end].translate()[:10])
+            quest = input(
+                "Is this the beginning of your gene?(position %i) (y/n):" % (start)
+            )
+        print(gene.seq[start:end].translate()[-10:])
+        quest = "g"
+        while quest != "n" and quest != "y":
+            quest = input("Is the size of your gene %ibp? (y/n):" % (end - start))
+        while quest == "n":
+            try:
+                end = int(input("Enter nucleotide length of your gene:")) + start
+                if (end - start) % 3 != 0:
+                    print("Length is not divisible by 3")
+                    continue
+                print(gene.seq[start:end].translate()[-10:])
+                quest = input("Is this end correct? (y/n):")
+            except:
+                print("Please enter a number")
+                quest = "n"
     return start, end

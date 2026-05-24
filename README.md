@@ -20,18 +20,36 @@ Run DIMPLE in a [Google Colab](https://colab.research.google.com/github/coywil26
 
 ### Install requirements
 
-#### Using Conda
+#### Using uv (recommended)
 
-Use the supplied Conda environment file to install and manage dependencies. This will create a new environment called `dimple_env`.
+Use `uv` to create a local virtual environment and install the project plus
+dependencies from `pyproject.toml` and `uv.lock`.
 
-Use the following commands to install and load the environment:
+Install and sync dependencies:
+
+```{bash}
+uv sync
+```
+
+Run commands in the environment:
+
+```{bash}
+uv run python run_dimple.py -h
+uv run python run_dimple_gui.py
+uv run pytest
+```
+
+#### Using Conda (alternative)
+
+Use the supplied Conda environment file to install and manage dependencies.
+This creates a new environment called `dimple_env`:
 
 ```{bash}
 conda env create -f dimple_env.yml
 conda activate dimple_env
 ```
 
-#### Manually install requirements
+#### Using pip requirements (alternative)
 
 DIMPLE requires the following packages:
 
@@ -40,7 +58,11 @@ DIMPLE requires the following packages:
 - biopython
 - tkinter (only required for GUI version)
 
-Install with your preferred package manager (e.g. pip).
+Install with:
+
+```{bash}
+python -m pip install -r requirements.txt
+```
 
 Note: DIMPLE has been tested on Python version 3.12. Biopython is currently incompatible with Python 3.13 in some cases, and we recommend using Python 3.12 for now.
 
@@ -75,6 +97,8 @@ Both offer the same functionality, but the GUI is more user-friendly.
 Start the GUI with the following command:
 
 ```{bash}
+uv run python run_dimple_gui.py
+# or, without uv:
 python run_dimple_gui.py
 ```
 
@@ -92,6 +116,8 @@ Supply options, then generate library by pressing 'Run DIMPLE' button.
 See a description of options for command-line version:
 
 ```{bash}
+uv run python run_dimple.py -h
+# or, without uv:
 python run_dimple.py -h
 ```
 
@@ -144,7 +170,9 @@ Example output files are located in the `examples` directory.
 To test DIMPLE, run the following command from the root directory:
 
   ```{bash}
-python -m unittest discover
+uv run pytest
+# or, without uv:
+pytest
 ```
 
 This should pass without any errors. If you encounter any issues, please open an issue on the GitHub repository.
@@ -158,7 +186,7 @@ If you found DIMPLE useful, feel free to cite the publication describing it:
 
 # License
 
-This code is licensed under the terms of the MIT license: [License](License.txt)
+This code is licensed under the terms of the MIT license: [License](LICENSE)
 
 # Contributing
 

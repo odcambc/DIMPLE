@@ -1,6 +1,7 @@
 {
   "name": "DIMPLE Python 3.12",
   "image": "mcr.microsoft.com/devcontainers/python:3.12-bookworm",
+  // Installs DIMPLE + dev extras
   "postCreateCommand": "pip install --upgrade pip && pip install -e '.[dev]'",
   "customizations": {
     "vscode": {
@@ -8,11 +9,7 @@
         "ms-python.python",
         "ms-python.vscode-pylance",
         "ms-toolsai.jupyter"
-      ],
-      "settings": {
-        "python.testing.pytestEnabled": true,
-        "python.testing.pytestArgs": ["tests"]
-      }
+      ]
     }
   },
   "features": {

@@ -1,32 +1,32 @@
 [build-system]
-requires = ["setuptools>=61"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
-name = "DIMPLE"
-version = "0.0.0"
+name = "dimple"
+version = "0.1.0"
 description = "Deep Indel Missense Programmable Library Engineering"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.12"
 dependencies = [
-    "biopython",
-    "numpy",
-    "pydna",
+    "biopython==1.84",
+    "numpy==1.26.4",
+    "pydna==5.4.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
+    "black",
+    "isort",
+    "mypy",
+    "ruff",
 ]
 
-[tool.setuptools]
+[tool.hatch.build.targets.wheel]
 packages = ["DIMPLE"]
-include-package-data = true
-
-[tool.setuptools.package-data]
-DIMPLE = ["data/*"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -51,3 +51,28 @@ exclude_lines = [
     "pragma: no cover",
     "if __name__ == .__main__.:",
 ]
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+py_version = 312
+force_single_line = false
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+exclude = [".venv", "__pycache__"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = false

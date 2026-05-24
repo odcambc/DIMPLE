@@ -23,318 +23,32 @@ import re
 import warnings
 from difflib import SequenceMatcher
 from math import ceil
-from DIMPLE.utilities import findORF
+from DIMPLE.core import DIMPLE
+from DIMPLE.pool import addgene, Pool, DimpleRuntimeConfig
 
-import numpy as np
 from Bio import SeqIO, Align
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-from Bio.SeqUtils import MeltingTemp as mt
 from Bio.SeqUtils import seq3, seq1
 
 import logging
 
-# For testing
-from pydna.dseqrecord import Dseqrecord
-from pydna.amplify import pcr
 from Bio.Restriction import BsmBI, BsaI
 
 logger = logging.getLogger(__name__)
 
-def addgene(genefile, start=None, end=None):
-    """Generate a list of DIMPLE classes from a fasta file containing genes."""
-    print("Barcode: " + str(DIMPLE.barcodeF[0].seq))
-    print("Number of barcodes: " + str(len(DIMPLE.barcodeF)))
-    if start is None:
-        start = []
-    if end is None:
-        end = []
-    tmpgene = list(SeqIO.parse(genefile.replace("\\", ""), "fasta"))
-    tmpgene[0].seq = tmpgene[0].seq.upper()
-    tmpOLS = []
-    for gene in tmpgene:
-        if "start:" in gene.description and "end:" in gene.description:
-            start = int(gene.description.split("start:")[1].split(" ")[0]) - 1
-            end = int(gene.description.split("end:")[1].split(" ")[0])
-            gene.filename = genefile.replace("\\", "")
-            logger.info("Found start: " + str(start) + " and end: " + str(end))
-            logger.info("Inferred ORF sequence: " + str(gene.seq[start:end]))
-            logger.info("ORF translation: " + str(gene.seq[start:end].translate()))
-            tmpOLS.append(DIMPLE(gene, start, end))
-        else:
-            gene.filename = genefile.replace("\\", "")
-            tmpOLS.append(DIMPLE(gene, start, end))
-    return tmpOLS  # only return the class object itself if one gene is given
-
-
-class DIMPLE:
-    """Class for generating indel mutagenic scanning libraries."""
-
-    # Calculate and update maxfrag - Max number of nucleotides that a fragment can carry
-    @property
-    def synth_len(self):
-        return self.__breaksites
-
-    @synth_len.setter
-    def synth_len(self, value):
-        self._synth_len = value
-        self.maxfrag = value - self.maxfrag_offset
-
-    random_seed = 0
-
-    # Shared variables for all genes
-    # Number of nucleotides in synthesis length to preserve for cutsites and primers. Cutsites are
-    # composed of the cutsite, the cutsite buffer, and the cutsite overhang
-    # Length of cutsite is
-    # len_cutsite = len(DIMPLE.cutsite) + len(DIMPLE.cutsite_buffer) + DIMPLE.cutsite_overhang
-    # Max oligo primer pair length is 2*21 = 42
-    # len_cutsite = len(self.cutsite) + len(self.cutsite_buffer) + self.cutsite_overhang = 22
-    maxfrag_offset = 64
-    minfrag = 24  # Picked based on smallest size for golden gate fragment efficiency
-    primerBuffer = 30  # This extends the sequence beyond the ORF for a primer. Must be greater than 30
-    allhangF = []
-    allhangR = []
-    primerTm = (56.5, 60)  # Melting temperature limits for primers
-    gene_primerTm = (58, 62)  # Help gene primer amplification
-    # Load Barcodes
-    dataDirectory = os.path.abspath(os.path.dirname(__file__))
-    try:
-        barcodeF = list(
-            SeqIO.parse(dataDirectory + "/data/forward_finalprimers.fasta", "fasta")
-        )
-        barcodeR = list(
-            SeqIO.parse(dataDirectory + "/data/reverse_finalprimers.fasta", "fasta")
-        )
-    except FileNotFoundError as exc:
-        raise ValueError(
-            "Could not find barcode files. Please upload your own or place standard barcodes in the data file."
-        ) from exc
-
-    def __init__(self, gene, start=None, end=None):
-
-        # Set up random number generator
-        self.rng = np.random.default_rng(DIMPLE.random_seed)
-
-        #  Search for ORF
-        try:
-            DIMPLE.maxfrag  # if DIMPLE.maxfrag doesn't exist, create it
-        except AttributeError:
-            DIMPLE.maxfrag = (
-                self.synth_len - self.maxfrag_offset
-            )  # based on space for barcodes, cut sites, handle. Doesn't need to be exact
-
-        self.geneid = gene.name
-        self.linked = set()
-        self.genePrimer = []
-        self.oligos = []
-        self.barPrimer = []
-        self.fullGene = gene.seq.upper()
-        self.split = 0
-        self.num_frag_per_oligo = 1
-        self.doublefrag = 0
-        self.filename = gene.filename
-        # Set up variables. Could have this as user input in the class
-        self.SynonymousCodons = {
-            "Cys": ["TGT", "TGC"],
-            "Asp": ["GAT", "GAC"],
-            "Ser": ["TCT", "TCG", "TCA", "TCC", "AGC", "AGT"],
-            "Gln": ["CAA", "CAG"],
-            "Met": ["ATG"],
-            "Asn": ["AAC", "AAT"],
-            "Pro": ["CCT", "CCG", "CCA", "CCC"],
-            "Lys": ["AAG", "AAA"],
-            "STOP": ["TAG", "TGA", "TAA"],
-            "Thr": ["ACC", "ACA", "ACG", "ACT"],
-            "Phe": ["TTT", "TTC"],
-            "Ala": ["GCA", "GCC", "GCG", "GCT"],
-            "Gly": ["GGT", "GGG", "GGA", "GGC"],
-            "Ile": ["ATC", "ATA", "ATT"],
-            "Leu": ["TTA", "TTG", "CTC", "CTT", "CTG", "CTA"],
-            "His": ["CAT", "CAC"],
-            "Arg": ["CGA", "CGC", "CGG", "CGT", "AGG", "AGA"],
-            "Trp": ["TGG"],
-            "Val": ["GTA", "GTC", "GTG", "GTT"],
-            "Glu": ["GAG", "GAA"],
-            "Tyr": ["TAT", "TAC"],
-        }
-        self.aminoacids = [
-            "Cys",
-            "Asp",
-            "Ser",
-            "Gln",
-            "Met",
-            "Asn",
-            "Pro",
-            "Lys",
-            "Thr",
-            "Phe",
-            "Ala",
-            "Gly",
-            "Ile",
-            "Leu",
-            "His",
-            "Arg",
-            "Trp",
-            "Val",
-            "Glu",
-            "Tyr"
-        ]
-        if self.stop_codon:
-            self.aminoacids.append("STOP")
-        self.complement = {"A": "T", "C": "G", "G": "C", "T": "A"}
-
-        self.designed_variants = {}
-
-
-        # First check for unwanted cutsites (BsaI sites and BsmBI sites)
-        match_sites = [
-                gene.seq.upper().count(cut)
-                + gene.seq.upper().count(cut.reverse_complement())
-                for cut in DIMPLE.avoid_sequence
-            ]
-        if any(match_sites):
-            raise ValueError(
-                "Unwanted Restriction cut sites found. Please input plasmids with these removed."
-                + str([DIMPLE.avoid_sequence[i] for i, x in enumerate(match_sites) if bool(x)])
-            )  # change codon
-
-        # Check for ORF specification and record start and end
-        logger.info("Checking for ORF specification")
-        logger.info("Start: " + str(start) + " End: " + str(end))
-        if start is not None and end is not None:
-            logger.info("Using user-specified ORF")
-            logger.info("Start: " + str(start) + " End: " + str(end))
-            logger.info("ORF length: " + str(end - start))
-            if (end - start) % 3 != 0:
-                print("Gene length is not divisible by 3. Resetting and attempting to identify ORF.")
-                logger.warning("Gene length is not divisible by 3. Resetting and attempting to identify ORF.")
-                start = None
-                end = None
-        if start is None or end is None:
-            logger.info("Start and end of ORF were not provided. Manually identifying ORF.")
-            start, end = findORF(gene)
-            logger.info("Found the following positions: Start: " + str(start) + " End: " + str(end))
-
-        self.aacount = int((end - start) / 3)
-        self.start = start
-        self.end = end
-        logger.info("Using the following ORF positions:")
-        logger.info("Start: " + str(start) + " End: " + str(end))
-
-
-        # record sequence with extra bp to account for primer. for plasmids (circular) we can rearrange linear sequence)
-        if start - self.primerBuffer < 0:
-            self.seq = (
-                gene.seq[start + 3 - self.primerBuffer:]
-                + gene.seq[: end + self.primerBuffer]
-            )
-        elif end + self.primerBuffer > len(gene.seq):
-            self.seq = (
-                gene.seq[start + 3 - self.primerBuffer:]
-                + gene.seq[: end + self.primerBuffer - len(gene.seq)]
-            )
-        else:
-            self.seq = gene.seq[start + 3 - self.primerBuffer: end + self.primerBuffer]
-        self.seq = self.seq.upper()
-
-        # Determine Fragment Size and store beginning and end of each fragment
-        num = int(
-            round(((end - start - 3) / float(DIMPLE.maxfrag)) + 0.499999999)
-        )  # total bins needed (rounded up)
-
-        insertionsites = range(start + 3, end, 3)
-        fragsize = [len(insertionsites[i::num]) * 3 for i in list(range(num))]
-
-        # if any(x<144 for x in fragsize):
-        #     raise ValueError('Fragment size too low')
-        print("Initial Fragment Sizes for:" + self.geneid)
-        print(fragsize)
-
-        total = DIMPLE.primerBuffer
-        breaksites = [DIMPLE.primerBuffer]
-
-        for x in fragsize:
-            total += x
-            breaksites.extend([total])
-        self.breaklist = [
-            [x, x + fragsize[idx]] for idx, x in enumerate(breaksites[:-1])
-        ]  # insertion site to insertion site
-        self.problemsites = set()
-        self.unique_Frag = [True] * len(fragsize)
-        self.fragsize = fragsize
-        self.__breaksites = breaksites
-
-
-    def ochre(self):
-        if len(self.SynonymousCodons["STOP"]) < 2:
-            raise Exception("You have removed all stop codons")
-        self.usage_ecoli["TAG"] = 1
-        self.usage_human["TAG"] = 1
-        # SynonymousCodons['STOP'] = ['TGA','TAA']
-        del self.SynonymousCodons["STOP"][0]
-        self.SynonymousCodons["OCHRE"] = ["TAG"]
-        self.aminoacids.extend("OCHRE")
-
-    def amber(self):
-        if len(self.SynonymousCodons["STOP"]) < 2:
-            raise Exception("You have removed all stop codons")
-        self.usage_ecoli["TAA"] = 1
-        self.usage_human["TAA"] = 1
-        del self.SynonymousCodons["STOP"][2]
-        self.SynonymousCodons["AMBER"] = ["TAA"]
-        self.aminoacids.extend("AMBER")
-
-    def opal(self):
-        if len(self.SynonymousCodons["STOP"]) < 2:
-            raise Exception("You have removed all stop codons")
-        self.usage_ecoli["TGA"] = 1
-        self.usage_human["TGA"] = 1
-        del self.SynonymousCodons["STOP"][1]
-        self.SynonymousCodons["OPAL"] = ["TGA"]
-        self.aminoacids.extend("OPAL")
-
-    def __getitem__(self):
-        return
-
-    # Update Breaksites
-    @property
-    def breaksites(self):
-        return self.__breaksites
-
-    @breaksites.setter
-    def breaksites(self, value):
-        if isinstance(value, list):
-            if any([(x - DIMPLE.primerBuffer) % 3 != 0 for x in value]):
-                raise ValueError("New Breaksites are not divisible by 3")
-            if (
-                value[0] != self.breaksites[0] or value[-1] != self.breaksites[-1]
-            ) and not DIMPLE.dms:
-                if (
-                    input(
-                        "Beginning and End of gene have changed. Are you sure you want to continue? (y/n)"
-                    )
-                    != "y"
-                ):
-                    raise Exception("Canceled user set break sites")
-            self.__breaksites = value
-            fragsize = [j - i for i, j in zip(value[:-1], value[1:])]
-            self.fragsize = fragsize
-            self.breaklist = [
-                [x, x + fragsize[idx]] for idx, x in enumerate(value[:-1])
-            ]  # insertion site to insertion site
-            print("New Fragment Sizes for: " + self.geneid)
-            print(fragsize)
-            # fragment_genes(self)
-
-        else:
-            raise ValueError("Breaklist input is not a list")
-
-
 # This function is not used in the current version of the code
 # This will find genes that share the same sequence and avoid synthesizing the same oligos multiple times
-def align_genevariation(OLS):
-    if not isinstance(OLS[0], DIMPLE):
+def align_genevariation(pool):
+    if not isinstance(pool[0], DIMPLE):
         raise TypeError("Not an instance of the DIMPLE class")
+    def should_link_genes() -> bool:
+        if pool.config.link_policy == "always":
+            return True
+        if pool.config.link_policy == "never" or pool.config.non_interactive:
+            return False
+        return input("Are these genes linked? (y/n):") == "y"
+
     match = []
     aligner = Align.PairwiseAligner()
     aligner.mode = "global"
@@ -342,11 +56,11 @@ def align_genevariation(OLS):
     aligner.mismatch_score = -1
     print("------------Finding homologous regions------------")
     # First find genes with matching sequences
-    for m in range(len(OLS)):
-        remlist = range(len(OLS))[m + 1 :]
+    for m in range(len(pool)):
+        remlist = range(len(pool))[m + 1 :]
         for p in remlist:
             alignments = aligner.align(
-                OLS[m].seq, OLS[p].seq
+                pool[m].seq, pool[p].seq
             )
             for alignment in alignments:
                 score = alignment.score
@@ -357,15 +71,15 @@ def align_genevariation(OLS):
                     x for x, geneset in enumerate(match) if m in geneset or p in geneset
                 ]  # Determine if aligned genes are in any of the previously matched sets
                 if not index:  # Create a new set if not
-                    print(OLS[m].geneid)
-                    print(OLS[p].geneid)
-                    if input("Are these genes linked? (y/n):") == "y":
+                    print(pool[m].geneid)
+                    print(pool[p].geneid)
+                    if should_link_genes():
                         match.append(set([m, p]))
                 else:
                     if p not in match[index[0]] or m not in match[index[0]]:
                         for items in match[index[0]].union(set([p, m])):
-                            print(OLS[items].geneid)
-                        if input("Are these genes linked? (y/n):") == "y":
+                            print(pool[items].geneid)
+                        if should_link_genes():
                             match[index[0]].add(p)
                             match[index[0]].add(m)
     # Create fragments for each match
@@ -374,59 +88,59 @@ def align_genevariation(OLS):
             matchset = list(tmpset)
             print(
                 "Determining Gene Variation for genes:"
-                + ",".join([OLS[i].geneid for i in matchset])
+                + ",".join([pool[i].geneid for i in matchset])
             )
             max_gene_len = 0
             variablesites = set()
             for i, j in itertools.combinations(matchset, 2):
                 max_gene_len = max(
                     max_gene_len,
-                    len(OLS[i].seq) - 2 * DIMPLE.primerBuffer,
-                    len(OLS[j].seq) - 2 * DIMPLE.primerBuffer,
+                    len(pool[i].seq) - 2 * pool.config.primer_buffer,
+                    len(pool[j].seq) - 2 * pool.config.primer_buffer,
                 )
-                seq_match = SequenceMatcher(None, OLS[i].seq, OLS[j].seq)
+                seq_match = SequenceMatcher(None, pool[i].seq, pool[j].seq)
                 # Determine variable regions
                 variablesites.update(
                     [
                         x.size
                         for x in seq_match.get_matching_blocks()
-                        if x.size != len(OLS[i].seq)
-                        and x.size != len(OLS[j].seq)
+                        if x.size != len(pool[i].seq)
+                        and x.size != len(pool[j].seq)
                         and x.size != 0
                     ]
                 )  # not sure how to account for zero
             problemsites = set()
             for kk in variablesites:
                 problemsites.update(
-                    range(kk - DIMPLE.primerBuffer, kk + DIMPLE.primerBuffer)
+                    range(kk - pool.config.primer_buffer, kk + pool.config.primer_buffer)
                 )  # Add space for primers to bind
             # Determine Fragment Size while avoiding variable regions - must be same for all genes
             num = int(
-                round(((max_gene_len) / float(DIMPLE.maxfrag)) + 0.499999999)
+                round(((max_gene_len) / float(pool.config.maxfrag)) + 0.499999999)
             )  # total bins needed (rounded up)
             insertionsites = range(
-                DIMPLE.primerBuffer, max_gene_len + DIMPLE.primerBuffer - 6, 3
+                pool.config.primer_buffer, max_gene_len + pool.config.primer_buffer - 6, 3
             )  # all genes start with a buffer
             fragsize = [len(insertionsites[i::num]) * 3 for i in list(range(num))]
-            total = DIMPLE.primerBuffer
+            total = pool.config.primer_buffer
             breaksites = [
-                DIMPLE.primerBuffer
+                pool.config.primer_buffer
             ]  # first site is always the max primer length (adjusted at beginning)
             for x in fragsize:
                 total += x
                 breaksites.extend([total])
             available_sites = [
                 xsite
-                for xsite in range(0, max_gene_len + DIMPLE.primerBuffer + 1, 3)
+                for xsite in range(0, max_gene_len + pool.config.primer_buffer + 1, 3)
                 if xsite not in problemsites
             ]
-            breaksites = [(
+            breaksites = [
                 site
                 if site in available_sites
                 else min(available_sites, key=lambda x: abs(x - site))
                 for site in breaksites
-            )]  # remove problemsites?
-            if any(x < DIMPLE.minfrag or x > DIMPLE.maxfrag for x in fragsize):
+            ]  # remove problemsites?
+            if any(x < DIMPLE.minfrag or x > pool.config.maxfrag for x in fragsize):
                 print(fragsize)
                 raise ValueError(
                     "Fragment size too low"
@@ -439,7 +153,7 @@ def align_genevariation(OLS):
                 [] for x in range(max(matchset) + 1)
             ]  # a list of fragments that do not match
             for x in breaklist:
-                sequences = [str(OLS[i].seq[x[0] : x[1]]) for i in matchset]
+                sequences = [str(pool[i].seq[x[0] : x[1]]) for i in matchset]
                 index = [
                     matchset[i]
                     for i, x in enumerate(sequences)
@@ -458,449 +172,32 @@ def align_genevariation(OLS):
             ) in (
                 matchset
             ):  # setting these to the same variable should link them for processing later
-                OLS[
+                pool[
                     idx
                 ].problemsites = (problemsites)  # add gap range to problemsites variable to avoid breaking in a gap
-                OLS[idx].breaklist = breaklist
-                OLS[idx].fragsize = fragsize
-                OLS[idx].breaksites = breaksites
-                OLS[idx].linked.update(matchset)
-                OLS[idx].unique_Frag = unique_Frag[idx]
+                pool[idx].breaklist = breaklist
+                pool[idx].fragsize = fragsize
+                pool[idx].breaksites = breaksites
+                pool[idx].linked.update(matchset)
+                pool[idx].unique_Frag = unique_Frag[idx]
     else:
         print(
             "No redundant sequences found. Matching sequences may be too short or not aligned to reduce number of oligos synthesized"
         )
 
-def find_geneprimer(genefrag, start, end):
-    # 3' end of primer is variable to adjust melting temperature
-    # 5' end of primer is fixed, with restriction site added
-    # Also add space for maximum deletion on 5' end
-    primer = (
-        genefrag[start:end].complement() + DIMPLE.cutsite[::-1] + "ATA"
-    )  # added ATA for cleavage close to end of DNA fragment
-    # Check melting temperature
-    # find complementary sequences
-    comp = 0  # compensate for bases that align with bsmbi
-    while primer.complement()[end - start + comp] == genefrag[end + comp]:
-        comp += 1
-    # comp += 1 # This is important for single basepair overhang
-    tm2 = mt.Tm_NN(primer[0: end - start + comp], nn_table=mt.DNA_NN2)
-    tm4 = mt.Tm_NN(primer[0: end - start + comp], nn_table=mt.DNA_NN4)
-    count = 0
-    while (
-        tm2 < DIMPLE.gene_primerTm[0]
-        or tm2 > DIMPLE.gene_primerTm[1]
-        or tm4 < DIMPLE.gene_primerTm[0]
-        or tm4 > DIMPLE.gene_primerTm[1]
-    ):
-        if tm2 < DIMPLE.gene_primerTm[0] or tm4 < DIMPLE.gene_primerTm[0]:
-            start += -1
-            primer = (
-                genefrag[start:end].complement() + DIMPLE.cutsite[::-1] + "ATA"
-            )  # cut site addition
-            tm2 = mt.Tm_NN(primer[0: end - start + comp], nn_table=mt.DNA_NN2)
-            tm4 = mt.Tm_NN(primer[0: end - start + comp], nn_table=mt.DNA_NN4)
-        if (
-            count > 12 or start == 0
-        ):  # stop if caught in inf loop or if linker is at max (31 + 7 = 38 bases)
-            break
-        if tm2 > DIMPLE.gene_primerTm[1] and tm4 > DIMPLE.gene_primerTm[1]:
-            start += 1
-            primer = genefrag[start:end].complement() + DIMPLE.cutsite[::-1] + "ATA"
-            # tm = mt.Tm_NN(primer[0:e-s+comp],c_seq=genefrag[s:e+comp],nn_table=mt.DNA_NN2)
-            tm2 = mt.Tm_NN(primer[0: end - start + comp], nn_table=mt.DNA_NN2)
-            tm4 = mt.Tm_NN(primer[0: end - start + comp], nn_table=mt.DNA_NN4)
-        count += 1
-    # optional - force first nucleotide to a C or G
-    # while primer[0]=="T" or primer[0]=="A" or primer[0]=="t" or primer[0]=="a":
-    #     s += -1
-    #     primer = genefrag[s:e].complement()+"CTCTGCA"
-    #     tm = mt.Tm_NN(primer[0:e-s+comp],nn_table=mt.DNA_NN2)
-    # return final primer with tm
-    print(
-        "Generated primers: ",
-        primer.complement().reverse_complement(),
-        round(tm2, 1),
-        start,
-    )
-    return primer.complement().reverse_complement(), round(tm2, 1), start
-
-
-def find_fragment_primer(fragment, stop):
-    # This function finds optimal primer for OLS subpool by changing 3' end of primer
-    start = 0  # starts at maximum length (5' is fixed)
-    if stop > 25:  # limit primer to 25 bases to begin with
-        end = 25
-    else:
-        end = stop
-    count = 0
-    primer = fragment[start:end]
-    tm2 = mt.Tm_NN(
-        primer, nn_table=mt.DNA_NN2
-    )  # Two methods of finding melting temperature seems more consistent
-    tm4 = mt.Tm_NN(primer, nn_table=mt.DNA_NN4)
-    while (
-        tm2 < DIMPLE.primerTm[0]
-        or tm2 > DIMPLE.primerTm[1]
-        or tm4 < DIMPLE.primerTm[0]
-        or tm4 > DIMPLE.primerTm[1]
-        or len(primer) < 16
-    ):
-        count += 1
-        if (
-            count > 12 or end > stop
-        ):  # stop if caught in inf loop or if primer is larger than the barcode
-            end = stop
-            primer = fragment[start:end]
-            break
-
-        if tm2 < DIMPLE.primerTm[0] or tm4 < DIMPLE.primerTm[0]:
-            if start == 0:
-                break
-            end += 1
-            primer = fragment[start:end]
-            tm2 = mt.Tm_NN(primer, nn_table=mt.DNA_NN2)
-            tm4 = mt.Tm_NN(primer, nn_table=mt.DNA_NN4)
-
-        if tm2 > DIMPLE.primerTm[1] or tm4 > DIMPLE.primerTm[1]:
-            end += -1
-            primer = fragment[start:end]
-            tm2 = mt.Tm_NN(primer, nn_table=mt.DNA_NN2)
-            tm4 = mt.Tm_NN(primer, nn_table=mt.DNA_NN4)
-    return primer, round(tm2, 1)
-
-
-def check_nonspecific(primer, fragment, point):
-    non = []
-    # fragment is the entire gene sequence plus the buffer sequence on each side
-    # point is the position of the primer in the fragment
-    # Forward
-    for i in range(len(fragment) - len(primer)):  # Scan each position
-        # first check if the primer binds at each position in the fragment
-        match = [
-            primer[j].lower() == fragment[i + j].lower() for j in range(len(primer))
-        ]
-        first = 10
-        for k in range(len(match) - 3):
-            if (match[k] and match[k + 1] and match[k + 3]) or (
-                match[k] and match[k + 1] and match[k + 2]
-            ):
-                first = k
-                break
-        # if the primer binds to 80% of the first ... bases
-        # and more than 6 bases
-        # and the 3' matches
-        # then check melting temperature
-        if (
-            sum(match[first:]) > len(primer[first:]) * 0.8
-            and sum(match[first:]) > 6
-            and match[-1]
-            and point != i
-        ):  # string compare - sum of matched nt is greater than 80%
-            try:
-                # check the melting temperature of the primer
-                melt = mt.Tm_NN(
-                    primer[first:],
-                    c_seq=fragment[i + first : i + len(primer)].complement(),
-                    nn_table=mt.DNA_NN2,
-                    de_table=mt.DNA_DE1,
-                    imm_table=mt.DNA_IMM1,
-                )
-                if melt > 25:
-                    print("Found non-specific match at " + str(i + 1) + "bp:")
-                    print("match: " + fragment[i: i + len(primer)])
-                    print("primer:" + primer + " Tm:" + str(round(melt, 1)))
-                    logger.warning("Found non-specific match at " + str(i + 1) + "bp:")
-                    logger.warning("match: " + fragment[i: i + len(primer)])
-                    logger.warning("primer:" + primer + " Tm:" + str(round(melt, 1)))
-                if melt > 35:
-                    non.append(True)
-            except ValueError as valerr:
-                print(
-                    str(valerr)
-                    + ". Please check position manually:"
-                    + str(i + 1)
-                    + " forward"
-                )
-                print("Primer:" + primer)
-                print("Match: " + fragment[i : i + len(primer)])
-                non.append(False)
-    # Reverse
-    fragment = fragment.reverse_complement()
-    for i in range(len(fragment) - len(primer)):
-        match = [
-            primer[j].lower() == fragment[i + j].lower() for j in range(len(primer))
-        ]
-        first = 10
-        for k in range(0, len(match) - 3, 1):
-            if match[k] and match[k + 1] and match[k + 3]:
-                first = k
-                break
-        if (
-            sum(match[first:]) > len(primer[first:]) * 0.8
-            and sum(match[first:]) > 6
-            and match[-1]
-            and point != -i
-        ):  # string compare - sum of matched nt is greater than 80%
-            try:
-                melt = mt.Tm_NN(
-                    primer[first:],
-                    c_seq=fragment[i + first : i + len(primer)].complement(),
-                    nn_table=mt.DNA_NN2,
-                    de_table=mt.DNA_DE1,
-                    imm_table=mt.DNA_IMM1,
-                )
-                if melt > 20:
-                    print("Found non-specific match at " + str(i + 1) + "bp:")
-                    print(" match:" + fragment[i : i + len(primer)])
-                    print("primer:" + primer + " Tm:" + str(melt))
-                if melt > 35:
-                    non.append(True)
-            except ValueError as valerr:
-                print(
-                    str(valerr)
-                    + ". Please check position manually:"
-                    + str(i + 1)
-                    + " reverse"
-                )
-                print("Primer:" + primer)
-                print("Match: " + fragment[i : i + len(primer)])
-                non.append(False)
-    return sum(non)
-
-
-def recalculate_num_fragments(gene):
-    num = int(
-        round(((gene.end - gene.start) / float(gene.maxfrag)) + 0.499999999)
-    )  # total bins needed (rounded up)
-    insertionsites = range(gene.start + 3, gene.end, 3)
-    gene.fragsize = [len(insertionsites[i::num]) * 3 for i in list(range(num))]
-    total = DIMPLE.primerBuffer
-    breaksites = [DIMPLE.primerBuffer]
-    for x in gene.fragsize:
-        total += x
-        breaksites.extend([total])
-    # if DIMPLE.dms:
-    #     tmpbreaklist = []
-    #     for idx, x in enumerate(breaksites[:-1]):
-    #         if idx:
-    #             tmpbreaklist.append([x, x + gene.fragsize[idx]])
-    #         else:
-    #             tmpbreaklist.append([x + 3, x + gene.fragsize[idx] + 3])
-    #     gene.breaklist = tmpbreaklist
-    # else:
-    gene.breaklist = [
-        [x, x + gene.fragsize[idx]] for idx, x in enumerate(breaksites[:-1])
-    ]  # insertion site to insertion site
-    #gene.problemsites = set()
-    gene.breaksites = breaksites
-    gene.unique_Frag = [True] * len(gene.fragsize)
-    return gene
-
-
-def switch_fragmentsize(gene, detectedsite, OLS):
-    """TODO:
-    Docstring
-    """
-
-    if not isinstance(gene, DIMPLE):
-        raise TypeError("Not an instance of the DIMPLE class")
-    skip = False
-    count = 0
-    count2 = 0
-    print("Non specific Fragment:" + str(detectedsite))
-    if (
-        len(gene.fragsize) * gene.maxfrag < len(gene.seq) - gene.primerBuffer * 2
-    ):  # if the maxfrag has changed and it is impossible to split the gene into x number of fragments it should recalculate the number of fragments
-        gene = recalculate_num_fragments(gene)
-    else:
-        gene.problemsites.add(gene.breaksites[detectedsite])
-    if all(item == gene.maxfrag for item in gene.fragsize) or any(
-        item > gene.maxfrag for item in gene.fragsize
-    ):
-        gene.maxfrag += -1
-    while True:
-        if count > len(gene.breaksites):
-            # Randomly shift a fragment
-            count = 0
-            count2 += 1
-            detectedsite = gene.rng.integers(
-                1, len(gene.breaksites) - 1, dtype=int
-            )  # dont change beginning or end
-            if gene.fragsize[detectedsite - 1] == gene.maxfrag:
-                shift = -3
-            else:
-                if gene.rng.integers(0, 2, dtype=int):
-                    shift = 3
-                else:
-                    shift = -3
-            gene.breaksites[detectedsite] = gene.breaksites[detectedsite] + shift
-            gene.fragsize = [
-                j - i for i, j in zip(gene.breaksites[:-1], gene.breaksites[1:])
-            ]
-            # if DIMPLE.dms:
-            #     tmpbreaklist = []
-            #     for idx, x in enumerate(gene.breaksites[:-1]):
-            #         if idx:
-            #             tmpbreaklist.append([x, x + gene.fragsize[idx]])
-            #         else:
-            #             tmpbreaklist.append([x + 3, x + gene.fragsize[idx] + 3])
-            #     gene.breaklist = tmpbreaklist
-            # else:
-            gene.breaklist = [
-                [x, x + gene.fragsize[idx]]
-                for idx, x in enumerate(gene.breaksites[:-1])
-            ]
-            if count2 > len(gene.breaklist) * 3:
-                gene.maxfrag += -1  # try to change for only this gene...
-                if len(gene.fragsize) * gene.maxfrag < len(gene.seq):
-                    gene = recalculate_num_fragments(gene)
-                    count = 0
-                    count2 = 0
-        count += 1
-        # Find connecting Fragments
-        if detectedsite == 0 or detectedsite == len(gene.fragsize):
-            print("Issue with primer on end of gene")
-            skip = True
-            break
-        if (
-            gene.fragsize[detectedsite] == gene.fragsize[detectedsite - 1]
-            and gene.fragsize[detectedsite] >= gene.maxfrag
-        ):
-            if all(
-                item >= gene.maxfrag for item in gene.fragsize[detectedsite + 1 :]
-            ) and not all(
-                item >= gene.maxfrag for item in gene.fragsize[: detectedsite - 1]
-            ):
-                shift = 3
-                while gene.breaksites[detectedsite] + shift in gene.problemsites:
-                    shift += 3
-            if all(
-                item >= gene.maxfrag for item in gene.fragsize[: detectedsite - 1]
-            ) and not all(
-                item >= gene.maxfrag for item in gene.fragsize[detectedsite + 1 :]
-            ):
-                shift = -3
-                while gene.breaksites[detectedsite] + shift in gene.problemsites:
-                    shift += -3
-            else:
-                if (
-                    detectedsite < len(gene.fragsize) / 2
-                ):  # should be based on problemsites not where it is located in the gene
-                    shift = 3
-                    while gene.breaksites[detectedsite] + shift in gene.problemsites:
-                        shift += 3
-                else:
-                    shift = -3
-                    while gene.breaksites[detectedsite] + shift in gene.problemsites:
-                        shift += -3
-        elif gene.fragsize[detectedsite] > gene.fragsize[detectedsite - 1]:
-            shift = 3
-            while gene.breaksites[detectedsite] + shift in gene.problemsites:
-                shift += 3
-        elif gene.fragsize[detectedsite] < gene.fragsize[detectedsite - 1]:
-            shift = -3
-            while gene.breaksites[detectedsite] + shift in gene.problemsites:
-                shift += -3
-        elif (
-            gene.fragsize[detectedsite] == gene.fragsize[detectedsite - 1]
-            and gene.fragsize[detectedsite] < gene.maxfrag
-        ):
-            shift = -3
-            while gene.breaksites[detectedsite] + shift in gene.problemsites:
-                shift = -shift
-                if shift < 0:
-                    shift += -3
-        # Process shift and reprocess fragments
-        gene.breaksites[detectedsite] = gene.breaksites[detectedsite] + shift
-        gene.fragsize = [
-            j - i for i, j in zip(gene.breaksites[:-1], gene.breaksites[1:])
-        ]
-        # if DIMPLE.dms:
-        #     tmpbreaklist = []
-        #     for idx, x in enumerate(gene.breaksites[:-1]):
-        #         if idx:
-        #             tmpbreaklist.append([x, x + gene.fragsize[idx] + 3])
-        #         else:
-        #             tmpbreaklist.append([x + 3, x + gene.fragsize[idx] + 3])
-        #     gene.breaklist = tmpbreaklist
-        # else:
-        gene.breaklist = [
-            [x, x + gene.fragsize[idx]]
-            for idx, x in enumerate(gene.breaksites[:-1])
-        ]
-        # recheck for size limit issues
-        tmpsite = [
-            topidx for topidx, item in enumerate(gene.fragsize) if item > gene.maxfrag
-        ]
-        if tmpsite:
-            # pick which side to adjust
-            if tmpsite[0] == len(gene.fragsize):
-                detectedsite = tmpsite[0]
-            elif tmpsite[0] == 0:
-                detectedsite = tmpsite[0] + 1
-            elif tmpsite[0] == detectedsite and tmpsite[0] + 1 < len(gene.fragsize):
-                detectedsite = tmpsite[0] + 1
-            else:
-                detectedsite = tmpsite[0]
-        else:
-            break
-    print(gene.fragsize)
-    # align all linked genes to the same breaksites
-    for tmp in gene.linked:
-        OLS[tmp].breaksites = gene.breaksites
-        OLS[tmp].fragsize = gene.fragsize
-        OLS[tmp].breaklist = gene.breaklist
-    return skip
-
-
-def check_overhangs(gene, OLS, overlapL, overlapR):
-    """TODO:
-    Docstring
-    """
-    # Force all overhangs to be different within a gene (no more than 2 matching in a row)
-    switched = False
-    if not isinstance(gene, DIMPLE):
-        raise TypeError("Not an instance of the DIMPLE class")
-    while True:
-        detectedsites = set()  # stores matching overhangs
-        for idx, y in enumerate(gene.breaklist):
-            overhang_F = gene.seq[
-                y[0] - DIMPLE.cutsite_overhang - overlapL: y[0] - overlapR
-            ]  # Forward overhang
-            overhang_R = gene.seq[
-                y[1] + overlapL: y[1] + DIMPLE.cutsite_overhang + overlapR
-            ]  # Reverse overhang
-            if (
-                overhang_F == overhang_R
-                or overhang_F == overhang_R.reverse_complement()
-            ):
-                detectedsites.update([idx])
-        # overhang = []
-        # for idx, y in enumerate(gene.breaklist):
-        #     overhang.append([gene.seq[y[0] - DIMPLE.cutsite_overhang - overlapL: y[0] - overlapR], idx])  # Forward overhang
-        #     overhang.append([gene.seq[y[1] + overlapL: y[1] + DIMPLE.cutsite_overhang + overlapR], idx + 1])  # Reverse overhang
-        # detectedsites = set()  # stores matching overhangs
-        # for i in range(len(overhang)):  # check each overhang for matches
-        #     for j in [x for x in range(len(overhang)) if x != i]:  # permutate over every overhang combination to find matches
-        #         #if overhang[i][0] == overhang[j][0] or overhang[i][0][:3] == overhang[j][0][:3] or overhang[i][0][1:] == overhang[j][0][1:] or overhang[i][0] == overhang[i][0].reverse_complement():  # no 3 matching bases
-        #         if overhang[i][0] == overhang[j][0] or overhang[i][0] == overhang[i][0].reverse_complement():  # no 3 matching bases
-        #             detectedsites.update([overhang[i][1]])
-        for detectedsite in detectedsites:
-            switched = True
-            if detectedsite == 0:
-                detectedsite = 1  # don't mess with the first cut site
-            print(
-                "------------------ Fragment size swapped due to matching overhangs ------------------"
-            )
-            skip = switch_fragmentsize(gene, detectedsite, OLS)
-        else:  # if no detected sites
-            break
-    return switched
-
 
 def generate_DMS_fragments(
-    OLS, overlapL, overlapR, synonymous, custom_mutations, dms=True, insert=False, delete=False, dis=False, folder=""
+    pool,
+    overlapL,
+    overlapR,
+    synonymous,
+    custom_mutations,
+    dms=True,
+    insert=False,
+    delete=False,
+    dis=False,
+    folder="",
+    config=None,
 ):
     """Generates the mutagenic oligos and writes the output to files."""
 
@@ -921,7 +218,7 @@ def generate_DMS_fragments(
     # dms set to true for subsitition mutations
     # insert set to a list of insertions
     # delete set to a list of numbers of symmetrical deletions
-    if not isinstance(OLS[0], DIMPLE):
+    if not isinstance(pool[0], DIMPLE):
         raise TypeError("Not an instance of the DIMPLE class")
     # Loop through each gene or gene variation
     finishedGenes = []
@@ -931,23 +228,24 @@ def generate_DMS_fragments(
         if insert:
             insert_list.extend(insert)
         if dis:
-            insert_list.append(DIMPLE.handle)
+            insert_list.append(pool.config.handle)
         if insert or dis:
-            DIMPLE.maxfrag = (
-                DIMPLE.synth_len
+            pool.config.maxfrag = (
+                pool.config.synth_len
                 - DIMPLE.maxfrag_offset
                 - max([len(x) for x in insert_list])
                 - overlapL
                 - overlapR
             )  # increase barcode space to allow for variable sized fragments within an oligo
         if delete and not insert and not dis:
-            DIMPLE.maxfrag = DIMPLE.synth_len - DIMPLE.maxfrag_offset - overlapL - overlapR
-        print("New max fragment:" + str(DIMPLE.maxfrag))
-        for gene in OLS:
-            switch_fragmentsize(gene, 1, OLS)
+            pool.config.maxfrag = pool.config.synth_len - DIMPLE.maxfrag_offset - overlapL - overlapR
+        print("New max fragment:" + str(pool.config.maxfrag))
+        for gene in pool:
+            gene.maxfrag = pool.config.maxfrag
+            switch_fragmentsize(gene, 1, pool)
 
     # Generate oligos for each gene
-    for ii, gene in enumerate(OLS):
+    for ii, gene in enumerate(pool):
         print(gene.breaklist)
         print(
             "--------------------------------- Analyzing Gene:"
@@ -956,12 +254,12 @@ def generate_DMS_fragments(
         )
         # gene.breaklist[0][0] += 0  # Do not mutate first codon
         # gene.fragsize[0] += -3  # Adjust size to match breaklist
-        gene.maxfrag = DIMPLE.maxfrag
+        gene.maxfrag = pool.config.maxfrag
         if not any(
             [tmp in finishedGenes for tmp in gene.linked]
         ):  # only run analysis for one of the linked genes
             # Quality Control for overhangs from the same gene
-            check_overhangs(gene, OLS, overlapL, overlapR)
+            check_overhangs(gene, pool, overlapL, overlapR)
         # Generate oligos and Primers
         idx = 0  # index for fragment
         totalcount = 0
@@ -982,8 +280,8 @@ def generate_DMS_fragments(
             frag = gene.breaklist[idx]
             grouped_oligos = []
             # AA range for fragment (need to subtract beginning primer buffer)
-            fragstart = str(int((frag[0] - DIMPLE.primerBuffer) / 3) + 2)
-            fragend = str(int((frag[1] - DIMPLE.primerBuffer) / 3) + 1)
+            fragstart = str(int((frag[0] - pool.config.primer_buffer) / 3) + 2)
+            fragend = str(int((frag[1] - pool.config.primer_buffer) / 3) + 1)
             print(
                 "Creating Fragment:"
                 + gene.geneid
@@ -998,23 +296,24 @@ def generate_DMS_fragments(
             ):
                 # Primers for gene amplification with addition of restriction enzyme site
                 genefrag_R = gene.seq[
-                    frag[0] - DIMPLE.primerBuffer: frag[0] + DIMPLE.primerBuffer
+                    frag[0] - pool.config.primer_buffer: frag[0] + pool.config.primer_buffer
                 ]
                 reverse, tmR, sR = find_geneprimer(
-                    genefrag_R, 15, DIMPLE.primerBuffer + 1 - overlapL
+                    genefrag_R, 15, pool.config.primer_buffer + 1 - overlapL, pool
                 )  # 15 is just a starting point
                 genefrag_F = gene.seq[
-                    frag[1] - DIMPLE.primerBuffer: frag[1] + DIMPLE.primerBuffer
+                    frag[1] - pool.config.primer_buffer: frag[1] + pool.config.primer_buffer
                 ]
                 forward, tmF, sF = find_geneprimer(
                     genefrag_F.reverse_complement(),
                     15,
-                    DIMPLE.primerBuffer + 1 - overlapR
+                    pool.config.primer_buffer + 1 - overlapR,
+                    pool,
                 )
                 # negative numbers look for reverse primers
                 # 10 bases is the buffer overhang on the primer (ATA + (N))
-                tmpr = check_nonspecific(reverse, gene.seq, frag[0] - len(gene.seq) + 3 + len(DIMPLE.cutsite_buffer) + len(DIMPLE.cutsite) - overlapL)
-                tmpf = check_nonspecific(forward, gene.seq, frag[1] - 3 - len(DIMPLE.cutsite_buffer) - len(DIMPLE.cutsite) + overlapR)
+                tmpr = check_nonspecific(reverse, gene.seq, frag[0] - len(gene.seq) + 3 + len(pool.config.cutsite_buffer) + len(pool.config.cutsite) - overlapL)
+                tmpf = check_nonspecific(forward, gene.seq, frag[1] - 3 - len(pool.config.cutsite_buffer) - len(pool.config.cutsite) + overlapR)
                 if tmpf or tmpr:
                     # swap size with another fragment
                     print(
@@ -1026,7 +325,7 @@ def generate_DMS_fragments(
                     else:
                         print("Non specific primer R: " + reverse)
                     # swap size with another fragment
-                    skip = switch_fragmentsize(gene, idx, OLS)
+                    skip = switch_fragmentsize(gene, idx, pool)
                     if skip:
                         # if end of gene, try to extend primer to make it more specific?
                         if tmpr:
@@ -1050,9 +349,9 @@ def generate_DMS_fragments(
                             )
                     else:
                         # Quality Control for overhangs from the same gene
-                        # check_overhangs(gene, OLS)
-                        DIMPLE.barcodeF.extend(compileF)  # return unused barcodes
-                        DIMPLE.barcodeR.extend(compileR)
+                        # check_overhangs(gene, pool)
+                        pool.config.barcode_f.extend(compileF)  # return unused barcodes
+                        pool.config.barcode_r.extend(compileR)
                         compileF = []  # reset unused primers
                         compileR = []
                         gene.genePrimer = (
@@ -1061,9 +360,9 @@ def generate_DMS_fragments(
                         gene.barPrimer = []
                         idx = 0
                         continue  # return to the beginning
-                elif check_overhangs(gene, OLS, overlapL, overlapR):
-                    DIMPLE.barcodeF.extend(compileF)  # return unused barcodes
-                    DIMPLE.barcodeR.extend(compileR)
+                elif check_overhangs(gene, pool, overlapL, overlapR):
+                    pool.config.barcode_f.extend(compileF)  # return unused barcodes
+                    pool.config.barcode_r.extend(compileR)
                     compileF = []  # reset unused primers
                     compileR = []
                     gene.genePrimer = (
@@ -1101,13 +400,13 @@ def generate_DMS_fragments(
                 )
                 # Determine missing double mutations
                 beginning = int(
-                    (frag[0] - DIMPLE.primerBuffer - sR) / 3
+                    (frag[0] - pool.config.primer_buffer - sR) / 3
                 )  # Region missing double mutations
                 if beginning < 1:
                     beginning = 1
-                end = ceil((frag[1] - DIMPLE.primerBuffer + sF) / 3)
-                if end > ceil((gene.breaksites[-1] - DIMPLE.primerBuffer) / 3):
-                    end = ceil((gene.breaksites[-1] - DIMPLE.primerBuffer) / 3)
+                end = ceil((frag[1] - pool.config.primer_buffer + sF) / 3)
+                if end > ceil((gene.breaksites[-1] - pool.config.primer_buffer) / 3):
+                    end = ceil((gene.breaksites[-1] - pool.config.primer_buffer) / 3)
                 missingTmp = set()
                 for site in range(
                     beginning, end
@@ -1124,11 +423,11 @@ def generate_DMS_fragments(
                 # Create gene fragments with insertions
                 count = 0
                 tmpseq = gene.seq[
-                    frag[0] - DIMPLE.cutsite_overhang - overlapL : frag[1] + DIMPLE.cutsite_overhang + overlapR
+                    frag[0] - pool.config.cutsite_overhang - overlapL : frag[1] + pool.config.cutsite_overhang + overlapR
                 ].replace(
                     "-", ""
                 )  # extract sequence for oligo fragment include an extra 4 bases for BsmBI cut site and overlap
-                offset = DIMPLE.cutsite_overhang + overlapL
+                offset = pool.config.cutsite_overhang + overlapL
                 ## Create the mutations
                 dms_sequences = []
                 dms_sequences_double = []
@@ -1137,7 +436,7 @@ def generate_DMS_fragments(
                     # find custom mutations in the fragment range
                     tmp_positions = list(custom_mutations.keys())
                     tmp_tmp_positions = [
-                        x * 3 - 3 + gene.primerBuffer
+                        x * 3 - 3 + pool.config.primer_buffer
                         for x in list(custom_mutations.keys())
                     ]
                     tmp_mut_positions = [
@@ -1149,7 +448,7 @@ def generate_DMS_fragments(
                     positions = [tmp_positions[i] for i, x in tmp_mut_positions]
                 else:
                     mut_positions = range(offset, offset + frag[1] - frag[0], 3)
-                    positions = [int((frag[0] + x + 3 - offset - DIMPLE.primerBuffer) / 3) for x in mut_positions]
+                    positions = [int((frag[0] + x + 3 - offset - pool.config.primer_buffer) / 3) for x in mut_positions]
                 ### Deep Mutational Scanning
                 if dms:
                     mutations = {}
@@ -1185,7 +484,7 @@ def generate_DMS_fragments(
                                     if aa not in wt_codon
                                 ]
                                 p = [
-                                    gene.usage[aa] for aa in codons
+                                    pool.config.usage[aa] for aa in codons
                                 ]  # Find probabilities but not wild type codon
                                 p = [
                                     xp if xp > 0.1 else 0 for xp in p
@@ -1196,7 +495,7 @@ def generate_DMS_fragments(
                                 # if the user wants to maximize the number of nucleotide changes
                                 synonymous_mutation = []
                                 synonymous_position = 0
-                                if DIMPLE.maximize_nucleotide_change:
+                                if pool.config.maximize_nucleotide_change:
                                     # remove codons with only one change compared to wt_codon
                                     max_codons = [x for x in codons if sum([x[i] != wt_codon[i] for i in range(3)]) > 1]
                                     if max_codons:
@@ -1257,7 +556,7 @@ def generate_DMS_fragments(
                                             )
                                         )
                                         > 0
-                                        for x in DIMPLE.avoid_sequence
+                                        for x in pool.config.avoid_sequence
                                     ]
                                 ):
                                     mutation = gene.rng.choice(
@@ -1278,7 +577,7 @@ def generate_DMS_fragments(
                                     + wt[0]
                                     + str(
                                         int(
-                                            (frag[0] + i + 6 - offset - DIMPLE.primerBuffer)
+                                            (frag[0] + i + 6 - offset - pool.config.primer_buffer)
                                             / 3
                                         )
                                     )
@@ -1291,14 +590,14 @@ def generate_DMS_fragments(
                                         + wt[0]
                                         + str(
                                             int(
-                                                (frag[0] + i + 6 - offset - DIMPLE.primerBuffer)
+                                                (frag[0] + i + 6 - offset - pool.config.primer_buffer)
                                                 / 3
                                             )
                                         )
                                         + jk
                                         ] += str(synonymous_position) + '_' + synonymous_mutation[0]
                                 oligo_id = gene.geneid + "_DMS-" + str(idx + 1) + "_" + wt[0] + str(
-                                    int((frag[0] + i + 6 - offset - DIMPLE.primerBuffer) / 3)
+                                    int((frag[0] + i + 6 - offset - pool.config.primer_buffer) / 3)
                                 ) + jk
                                 dms_sequences.append(
                                     SeqRecord(
@@ -1313,10 +612,10 @@ def generate_DMS_fragments(
                                     mutation_type = 'X'
                                 else:
                                     mutation_type = 'M'
-                                name = f'{seq1(wt[0])}{int((frag[0] + i + 6 - offset - DIMPLE.primerBuffer) / 3)}{seq1(jk)}'
+                                name = f'{seq1(wt[0])}{int((frag[0] + i + 6 - offset - pool.config.primer_buffer) / 3)}{seq1(jk)}'
                                 gene.designed_variants[oligo_id] = {
                                         'count': 0,
-                                        'pos': int((frag[0] + i + 6 - offset - DIMPLE.primerBuffer) / 3),
+                                        'pos': int((frag[0] + i + 6 - offset - pool.config.primer_buffer) / 3),
                                         'mutation_type': mutation_type,
                                         'name': name,
                                         'codon': mutation[0],
@@ -1328,7 +627,7 @@ def generate_DMS_fragments(
                                         'xfrag': xfrag,
                                     }
                         # if double mutations are selected then make every possible double mutation
-                        if DIMPLE.make_double:
+                        if pool.config.make_double:
                             # select every permutation of mut_positions order doesn't matter
                             for combi in itertools.combinations(mutations.keys(), 2):
                                 # extract number from mutation name
@@ -1384,7 +683,7 @@ def generate_DMS_fragments(
                     # insertion
 
                     for i in range(offset, offset + frag[1] - frag[0], 3):
-                        pos = int((frag[0] + i + 3 - offset - DIMPLE.primerBuffer) / 3)
+                        pos = int((frag[0] + i + 3 - offset - pool.config.primer_buffer) / 3)
                         wt_pre_codon = tmpseq[i : i + 3].upper()
                         wt_post_codon = tmpseq[i + 3 : i + 6].upper()
                         wt_pre_aa = [
@@ -1410,7 +709,7 @@ def generate_DMS_fragments(
                                         + xfrag.upper().count(x.reverse_complement())
                                     )
                                     > 0
-                                    for x in DIMPLE.avoid_sequence
+                                    for x in pool.config.avoid_sequence
                                 ]
                             ):
                                 warnings.warn(
@@ -1459,7 +758,7 @@ def generate_DMS_fragments(
                     # Shifted down by 3 to avoid long deletions running into the primer binding region
                     for i in range(offset - 3, offset + frag[1] - frag[0] - 3, 3):
                         # Calculate the amino acid position too
-                        pos = int((frag[0] + i + 6 - offset - DIMPLE.primerBuffer) / 3)
+                        pos = int((frag[0] + i + 6 - offset - pool.config.primer_buffer) / 3)
                         # List of wt codons for each position in the range of deletion lengths
                         wt_codons = [tmpseq[i + j : i + j + 3].upper() for j in range(0, max(delete), 3)]
                         wt_aas = [
@@ -1495,11 +794,11 @@ def generate_DMS_fragments(
                                 )  # delete forward from position only
 
                             # Make sure that the 3' end has sufficient sequence to trim for cutsites
-                            # Number of bases trimmed is DIMPLE.cutsite_overhang (usually 4)
+                            # Number of bases trimmed is pool.config.cutsite_overhang (usually 4)
                             # Add dummy bases to 3' end if not enough sequence.
-                            if len(tmpseq[i + delete_n :]) < DIMPLE.cutsite_overhang:
+                            if len(tmpseq[i + delete_n :]) < pool.config.cutsite_overhang:
                                 pass
-                                #buffer_length = DIMPLE.cutsite_overhang - len(tmpseq[i + delete_n :])
+                                #buffer_length = pool.config.cutsite_overhang - len(tmpseq[i + delete_n :])
                                 #xfrag = xfrag + "N" * buffer_length
 
                             # Check each cassette for more than 2 BsmBI and 2 BsaI sites
@@ -1511,7 +810,7 @@ def generate_DMS_fragments(
                                         + xfrag.upper().count(x.reverse_complement())
                                     )
                                     > 0
-                                    for x in DIMPLE.avoid_sequence
+                                    for x in pool.config.avoid_sequence
                                 ]
                             ):
                                 warnings.warn(
@@ -1551,12 +850,35 @@ def generate_DMS_fragments(
                                 }
                 ### Scanning Domain Insertions
                 if dis:
+                    # Translate the domain insertion handle for naming in the output
+                    if len(pool.config.handle) % 3 == 0:
+                        handle_name = Seq(str(pool.config.handle)).translate()
+                    else:
+                        logger.warning(
+                            f'Domain insertion handle {pool.config.handle} is not a multiple of 3. Will not translate in output.'
+                        )
+                        handle_name = '(handle)'
                     # insertion
                     for i in range(offset, offset + frag[1] - frag[0], 3):
                         # if idx == 0:
                         #    continue
+                        pos = int(
+                            (frag[0] + i + 3 - offset - pool.config.primer_buffer) / 3
+                        )
+                        wt_pre_codon = tmpseq[i : i + 3].upper()
+                        wt_post_codon = tmpseq[i + 3 : i + 6].upper()
+                        wt_pre_aa = [
+                            name
+                            for name, codon in gene.SynonymousCodons.items()
+                            if wt_pre_codon in codon
+                        ]
+                        wt_post_aa = [
+                            name
+                            for name, codon in gene.SynonymousCodons.items()
+                            if wt_post_codon in codon
+                        ]
                         xfrag = (
-                                tmpseq[0:i] + DIMPLE.handle + tmpseq[i:]
+                                tmpseq[0:i] + pool.config.handle + tmpseq[i:]
                         )  # Add mutation to fragment
                         # Check each cassette for more than 2 BsmBI and 2 BsaI sites
                         while any(
@@ -1566,7 +888,7 @@ def generate_DMS_fragments(
                                             + xfrag.upper().count(x.reverse_complement())
                                     )
                                     > 2
-                                    for x in DIMPLE.avoid_sequence
+                                    for x in pool.config.avoid_sequence
                                 ]
                         ):
                             warnings.warn(
@@ -1575,24 +897,34 @@ def generate_DMS_fragments(
                             logger.warning(
                                 "Unwanted restriction site found within domain insertion fragment: " + str(xfrag)
                             )
+                            break
                             # not sure how to solve this issue
                             # mutation?
                             # xfrag = tmpseq[0:i] + mutation + tmpseq[i + 3:]
+                        oligo_id = (
+                            gene.geneid + "_DIS-" + str(idx + 1) + "_" + str(pos)
+                        )
                         dms_sequences.append(
                             SeqRecord(
                                 xfrag,
-                                id=gene.geneid
-                                   + "_DIS-"
-                                   + str(idx + 1)
-                                   + "_"
-                                   + str(
-                                    int(
-                                        (frag[0] + i + 3 - offset - DIMPLE.primerBuffer) / 3
-                                    )
-                                ),
+                                id=oligo_id,
                                 description="Frag " + fragstart + "-" + fragend,
                             )
                         )
+                        name = f'{seq1(wt_pre_aa)}{pos}_{seq1(wt_post_aa)}{pos+1}_ins{handle_name}'
+                        gene.designed_variants[oligo_id] = {
+                                'count': 0,
+                                'pos': pos,
+                                'mutation_type': 'DI',
+                                'name': name,
+                                'codon': str(pool.config.handle),
+                                'wt_codon': '',
+                                'mutation': f'DI_{len(pool.config.handle) // 3}',
+                                'length': len(pool.config.handle) // 3,
+                                'hgvs': f'p.({name})',
+                                'fragment': idx + 1,
+                                'xfrag': xfrag,
+                        }
                 for idx_type, dms_sequence_list in enumerate(
                         [dms_sequences, dms_sequences_double]
                 ):
@@ -1601,9 +933,9 @@ def generate_DMS_fragments(
                         tmR = 0
                         if gene.num_frag_per_oligo > 1:
                             dms_sequence_list = combine_fragments(
-                                dms_sequence_list, gene.num_frag_per_oligo, gene.split
+                                dms_sequence_list, gene.num_frag_per_oligo, gene.split, pool
                             )
-                        len_cutsite = len(DIMPLE.cutsite) + len(DIMPLE.cutsite_buffer) + DIMPLE.cutsite_overhang
+                        len_cutsite = len(pool.config.cutsite) + len(pool.config.cutsite_buffer) + pool.config.cutsite_overhang
                         # determine barcodes for subpool amplification based on smallest size
                         frag_sizes = [len(xf.seq) for xf in dms_sequence_list]
                         smallest_frag = dms_sequence_list[
@@ -1612,20 +944,20 @@ def generate_DMS_fragments(
                         while (
                                 tmF < DIMPLE.primerTm[0] or tmR < DIMPLE.primerTm[0]
                         ):  # swap out barcode if tm is low
-                            difference = DIMPLE.synth_len - (
+                            difference = pool.config.synth_len - (
                                     len(smallest_frag) + len_cutsite*2
                             )  # 14 bases is the length of the restriction sites with overhangs (7 bases each)
                             try:
-                                barF = DIMPLE.barcodeF.pop(0)
-                                barR = DIMPLE.barcodeR.pop(0)
+                                barF = pool.config.barcode_f.pop(0)
+                                barR = pool.config.barcode_r.pop(0)
                             except IndexError:
                                 raise Exception("Ran out of barcodes.")
                             count += 1  # How many barcodes used
                             compileF.append(barF)
                             compileR.append(barR)
                             while (difference / 2) > len(barF):
-                                tmpF = DIMPLE.barcodeF.pop(0)
-                                tmpR = DIMPLE.barcodeR.pop(0)
+                                tmpF = pool.config.barcode_f.pop(0)
+                                tmpR = pool.config.barcode_r.pop(0)
                                 compileF.append(tmpF)
                                 compileR.append(tmpR)
                                 barF += tmpF
@@ -1633,14 +965,14 @@ def generate_DMS_fragments(
                                 count += 1  # How many barcodes used
                             tmpfrag_1 = (
                                     barF.seq[0: int(difference / 2)]
-                                    + DIMPLE.cutsite
-                                    + DIMPLE.cutsite_buffer
-                                    + tmpseq[0:DIMPLE.cutsite_overhang]
+                                    + pool.config.cutsite
+                                    + pool.config.cutsite_buffer
+                                    + tmpseq[0:pool.config.cutsite_overhang]
                             )  # include recognition site and the 4 base overhang
                             tmpfrag_2 = (
-                                    tmpseq[-DIMPLE.cutsite_overhang:]
-                                    + DIMPLE.cutsite_buffer.reverse_complement()
-                                    + DIMPLE.cutsite.reverse_complement()
+                                    tmpseq[-pool.config.cutsite_overhang:]
+                                    + pool.config.cutsite_buffer.reverse_complement()
+                                    + pool.config.cutsite.reverse_complement()
                                     + barR.seq.reverse_complement()[
                                       0: difference - int(difference / 2)
                                       ]
@@ -1665,20 +997,20 @@ def generate_DMS_fragments(
                         ):  # add barcodes to the fragments to make the oligos
                             if insert or delete:
                                 difference = (
-                                        DIMPLE.synth_len - len(sequence.seq[DIMPLE.cutsite_overhang:-DIMPLE.cutsite_overhang]) - len_cutsite*2
+                                        pool.config.synth_len - len(sequence.seq[pool.config.cutsite_overhang:-pool.config.cutsite_overhang]) - len_cutsite*2
                                 )  # how many bases need to be added to make oligo correct length
                                 offset = int(difference / 2)  # force it to be a integer
 
                                 combined_sequence = (
                                         tmpfrag_1[:offset]
                                         + tmpfrag_1[-len_cutsite:]
-                                        + sequence.seq[DIMPLE.cutsite_overhang:-DIMPLE.cutsite_overhang]
+                                        + sequence.seq[pool.config.cutsite_overhang:-pool.config.cutsite_overhang]
                                         + tmpfrag_2[:len_cutsite]
                                         + tmpfrag_2[-(difference - offset):]
                                 )
                             else:
                                 combined_sequence = (
-                                        tmpfrag_1 + sequence.seq[DIMPLE.cutsite_overhang:-DIMPLE.cutsite_overhang] + tmpfrag_2
+                                        tmpfrag_1 + sequence.seq[pool.config.cutsite_overhang:-pool.config.cutsite_overhang] + tmpfrag_2
                                 )
                             if (
                                     primerF not in combined_sequence
@@ -1692,15 +1024,15 @@ def generate_DMS_fragments(
                                 logger.error("Primers no longer bind to oligo. Was not able to add barcode to oligo. Try adjusting fragment length or synthesis length and try again.")
                                 raise Exception("Primers no longer bind to oligo. Was not able to add barcode to oligo. Try adjusting fragment length or synthesis length and try again.")
                             if (
-                                    combined_sequence.upper().count(DIMPLE.cutsite)
+                                    combined_sequence.upper().count(pool.config.cutsite)
                                     + combined_sequence.upper().count(
-                                    DIMPLE.cutsite.reverse_complement()
+                                    pool.config.cutsite.reverse_complement()
                                     )
                                     < 2
                             ):
                                 raise Exception("Oligo does not have 2 cutsites")
-                            if len(combined_sequence) > DIMPLE.synth_len:
-                                raise Exception(f"Oligo too long: {str(len(combined_sequence))} is longer than {str(DIMPLE.synth_len)}")
+                            if len(combined_sequence) > pool.config.synth_len:
+                                raise Exception(f"Oligo too long: {str(len(combined_sequence))} is longer than {str(pool.config.synth_len)}")
                             if gene.doublefrag == 0:
                                 gene.oligos.append(
                                     SeqRecord(
@@ -1776,9 +1108,9 @@ def generate_DMS_fragments(
                             )
                         print("Barcodes tested:" + str(count))
                         # return unused barcodes
-                        DIMPLE.barcodeF.extend(compileF[:-2])
-                        DIMPLE.barcodeR.extend(compileR[:-2])
-                        print("Barcodes Remaining:" + str(len(DIMPLE.barcodeF)))
+                        pool.config.barcode_f.extend(compileF[:-2])
+                        pool.config.barcode_r.extend(compileR[:-2])
+                        print("Barcodes Remaining:" + str(len(pool.config.barcode_f)))
                         compileF = []  # reset unused primers
                         compileR = []
             if gene.doublefrag == 1:
@@ -1806,11 +1138,11 @@ def generate_DMS_fragments(
                     combined_sequence = sequence.seq
                     difference = 230 - len(combined_sequence)
                     # print(len(tmpseq))
-                    barF2 = DIMPLE.barcodeF.pop(0)
-                    barR2 = DIMPLE.barcodeR.pop(0)
+                    barF2 = pool.config.barcode_f.pop(0)
+                    barR2 = pool.config.barcode_r.pop(0)
                     while difference / 2 > len(barF2):
-                        barF2 += DIMPLE.barcodeF.pop(0)
-                        barR2 += DIMPLE.barcodeR.pop(0)
+                        barF2 += pool.config.barcode_f.pop(0)
+                        barR2 += pool.config.barcode_r.pop(0)
                     combined_sequence2 = (
                         barF2.seq[0 : int(difference / 2)]
                         + combined_sequence
@@ -1829,11 +1161,11 @@ def generate_DMS_fragments(
                     combined_sequence = sequence_one.seq
                     difference = 230 - len(combined_sequence)
                     # print(len(tmpseq))
-                    barF2 = DIMPLE.barcodeF.pop(0)
-                    barR2 = DIMPLE.barcodeR.pop(0)
+                    barF2 = pool.config.barcode_f.pop(0)
+                    barR2 = pool.config.barcode_r.pop(0)
                     while difference / 2 > len(barF2):
-                        barF2 += DIMPLE.barcodeF.pop(0)
-                        barR2 += DIMPLE.barcodeR.pop(0)
+                        barF2 += pool.config.barcode_f.pop(0)
+                        barR2 += pool.config.barcode_r.pop(0)
                     combined_sequence2 = (
                         barF2.seq[0 : int(difference / 2)]
                         + combined_sequence
@@ -1904,363 +1236,16 @@ def generate_DMS_fragments(
         finishedGenes.extend([ii])
 
 
-def combine_fragments(tandem, num_frag_per_oligo, split):
-    """TODO:
-    Docstring
-    """
-    tandem_seq = []
-    barcodes = []
-    if split:
-        tmpF = DIMPLE.barcodeF.pop(0)
-        tmpR = DIMPLE.barcodeR.pop(0)
-    direction = -1
-    while len(tandem) > num_frag_per_oligo:
-        tmp = tandem.pop(0)
-        tmp_tandem = tmp.seq
-        tandem_id = tmp.id
-        for x in range(num_frag_per_oligo - 1):
-            if split:
-                name = tmp.id
-                tmp = tandem.pop(0)
-                if direction == 1:
-                    tmp_tandem += (
-                        "G"
-                        + DIMPLE.cutsite.reverse_complement()
-                        + tmpR
-                        + tmpF
-                        + DIMPLE.cutsite
-                        + "C"
-                        + tmp.seq
-                    )  # concatenate and add cut sites with buffer
-                    direction = -1
-                else:
-                    tmp_tandem += (
-                        "G"
-                        + DIMPLE.cutsite.reverse_complement()
-                        + tmpR
-                        + tmpF
-                        + DIMPLE.cutsite
-                        + "C"
-                        + tmp.seq.reverse_complement()
-                    )  # concatenate and add cut sites with buffer
-                    direction = 1
-                tandem_id += "+" + tmp.id
-                barcodes.append(SeqRecord(tmpR, id=name))
-                barcodes.append(SeqRecord(tmpF, id=tmp.id))
-            else:
-                tmp = tandem.pop(0)
-                if direction == 1:
-                    tmp_tandem += (
-                        "G"
-                        + DIMPLE.cutsite.reverse_complement()
-                        + "ACGT"
-                        + DIMPLE.cutsite
-                        + "C"
-                        + tmp.seq
-                    )  # concatenate and add cut sites with buffer
-                    direction = -1
-                else:
-                    tmp_tandem += (
-                        "G"
-                        + DIMPLE.cutsite.reverse_complement()
-                        + "ACGT"
-                        + DIMPLE.cutsite
-                        + "C"
-                        + tmp.seq.reverse_complement()
-                    )
-                    direction = 1
-                tandem_id += "+" + tmp.id
-        tandem_seq.append(SeqRecord(tmp_tandem, id=tandem_id, description=""))
-
-    if tandem:
-        direction = -1
-        print(len(tandem))
-        tmp = tandem.pop(0)
-        tmp_tandem = tmp.seq
-        tandem_id = tmp.id
-        while tandem:
-            if split:
-                name = tmp.id
-                tmp = tandem.pop(0)
-                if direction == 1:
-                    tmp_tandem += (
-                        "G"
-                        + DIMPLE.cutsite.reverse_complement()
-                        + "ACGT"
-                        + DIMPLE.cutsite
-                        + "C"
-                        + tmp.seq
-                    )  # concatenate and add cut sites with buffer
-                    direction = 1
-                else:
-                    tmp_tandem += (
-                        "G"
-                        + DIMPLE.cutsite.reverse_complement()
-                        + "ACGT"
-                        + DIMPLE.cutsite
-                        + "C"
-                        + tmp.seq.reverse_complement()
-                    )  # concatenate and add cut sites with buffer
-                    direction = -1
-                tandem_id += "+" + tmp.id
-                barcodes.append(SeqRecord(tmpR, id=name))
-                barcodes.append(SeqRecord(tmpF, id=tmp.id))
-            else:
-                tmp = tandem.pop(0)
-                if direction == -1:
-                    tmp_tandem += (
-                        "G"
-                        + DIMPLE.cutsite.reverse_complement()
-                        + "ACGT"
-                        + DIMPLE.cutsite
-                        + "C"
-                        + tmp.seq
-                    )  # concatenate and add cut sites with buffer
-                    direction = 1
-                else:
-                    tmp_tandem += (
-                        "G"
-                        + DIMPLE.cutsite.reverse_complement()
-                        + "ACGT"
-                        + DIMPLE.cutsite
-                        + "C"
-                        + tmp.seq
-                    )
-                    direction = -1
-                tandem_id += "+" + tmp.id
-        difference = len(tandem_seq[-1].seq) - len(tmp_tandem)
-        barF = DIMPLE.barcodeF.pop(0)
-        barR = DIMPLE.barcodeR.pop(0)
-        while difference / 2 > len(barF):
-            barF += DIMPLE.barcodeF.pop(0)
-            barR += DIMPLE.barcodeR.pop(0)
-        tmpfrag = (
-            barF.seq[0 : int(difference / 2)]
-            + tmp_tandem
-            + barR.seq.reverse_complement()[0 : difference - int(difference / 2)]
-        )
-        tandem_seq.append(SeqRecord(tmpfrag, id=tandem_id, description=""))
-        print("Partial sequence" + str(len(tmpfrag)))
-    return tandem_seq
-
-
-def print_all(OLS, folder=""):
-    """Writes oligos and primers to files."""
-    if not isinstance(OLS[0], DIMPLE):
-        raise TypeError("Not an instance of the DIMPLE class")
-    alloligos = []
-    allprimers = []
-    for obj in OLS:
-        try:
-            alloligos.extend(obj.oligos)
-            allprimers.extend(obj.barPrimer)
-            allprimers.extend(obj.genePrimer)
-        except AttributeError:
-            print(obj.geneid + " has not been processed")
-    # Remove redundant sequences?
-    SeqIO.write(
-        alloligos, os.path.join(folder.replace("\\", ""), "All_Oligos.fasta"), "fasta"
-    )
-    SeqIO.write(
-        allprimers, os.path.join(folder.replace("\\", ""), "All_Primers.fasta"), "fasta"
-    )
-
-
-def post_qc(OLS):
-    logger.info("Running post QC")
-    if not isinstance(OLS[0], DIMPLE):
-        raise TypeError("Not an instance of the DIMPLE class")
-    # Post QC
-    all_oligos = []
-    all_barPrimers = []
-    for obj in OLS:
-        logger.info(f'Running QC for {obj.geneid}')
-        try:
-            all_oligos.extend(obj.oligos)
-            all_barPrimers.extend(obj.barPrimer)
-        except AttributeError:
-            print(obj.geneid + " has not been processed")
-
-        if DIMPLE.enzyme is not None:
-            logger.info(f"Checking oligo assembly for {obj.geneid}")
-            test_final_assembly(obj)
-        else:
-            logger.info(f"Skipping oligo assembly check for {obj.geneid} as no enzyme is specified.")
-
-
-
-    print("Running QC for barcode primer specificity")
-    cassetteSet = set(all_oligos[0].id[:-6])
-    uCassette = [SeqRecord(all_oligos[0].seq, id=all_oligos[0].id[:-6])]
-    for idx in range(len(all_oligos)):
-        if not all_oligos[idx].id[:-6] in cassetteSet:
-            uCassette.append(SeqRecord(all_oligos[idx].seq, id=all_oligos[idx].id[:-6]))
-        cassetteSet.add(all_oligos[idx].id[:-6])
-    grouped = iter(all_barPrimers)
-    grouped = zip(grouped, grouped)  # create the combinatorial comparisons
-    nonspecific = []
-    # iterate over every barcode primer pair and match to each oligo to check for nonspecific amplification
-    for idxPrime, primers in enumerate(
-        grouped
-    ):  # iterate over every barcode primer pair
-        print("Checking primer set:" + primers[0].id[:-2])
-        for idxCassette, fragment in enumerate(
-            uCassette
-        ):  # iterate over every OLS oligo
-            if (
-                primers[0].id.split("_")[2] != all_oligos[idxCassette].id.split("_")[2]
-            ):  # ignore designed annealing (same name)
-                fragname = fragment.id
-                fragment = fragment.seq
-                non = [[False], [False]]
-                for idxDirection, primer in enumerate(primers):
-                    primername = primer.id
-                    primer = primer.seq
-                    for i in range(
-                        len(fragment) - len(primer)
-                    ):  # iterate over the length of the oligo for a binding site
-                        match = [
-                            primer[j].lower() == fragment[i + j].lower()
-                            for j in range(len(primer))
-                        ]
-                        first = 10
-                        for k in range(len(match) - 3):
-                            if (match[k] and match[k + 1] and match[k + 3]) or (
-                                match[k] and match[k + 1] and match[k + 2]
-                            ):
-                                first = k
-                                break
-                        if (
-                            sum(match[first:]) > len(primer[first:]) * 0.8
-                            and sum(match[first:]) > 6
-                            and match[-1]
-                        ):  # string compare - sum of matched nt is greater than 80%
-                            try:
-                                melt = mt.Tm_NN(
-                                    primer[first:],
-                                    c_seq=fragment[
-                                        i + first : i + len(primer)
-                                    ].complement(),
-                                    nn_table=mt.DNA_NN2,
-                                    de_table=mt.DNA_DE1,
-                                    imm_table=mt.DNA_IMM1,
-                                )
-                                # if melt>20:
-                                #     print('Found non-specific match:'+fragment[i:i+len(primer)])
-                                #     print('                 primer:'+primer+' Tm:'+str(round(melt,1)))
-                                if melt > 35:
-                                    non[0].append(True)
-                            except ValueError as valerr:
-                                # print(str(valerr)+". Please check position manually:"+str(i+1)+" forward")
-                                # print('Primer:'+primer)
-                                # print('Match: '+fragment[i:i+len(primer)])
-                                pass
-                    fragment = fragment.reverse_complement()
-                    for i in range(len(fragment) - len(primer)):
-                        match = [
-                            primer[j].lower() == fragment[i + j].lower()
-                            for j in range(len(primer))
-                        ]
-                        first = 10
-                        for k in range(0, len(match) - 3, 1):
-                            if match[k] and match[k + 1] and match[k + 3]:
-                                first = k
-                                break
-                        if (
-                            sum(match[first:]) > len(primer[first:]) * 0.8
-                            and sum(match[first:]) > 6
-                            and match[-1]
-                        ):  # string compare - sum of matched nt is greater than 80%
-                            try:
-                                melt = mt.Tm_NN(
-                                    primer[first:],
-                                    c_seq=fragment[
-                                        i + first : i + len(primer)
-                                    ].complement(),
-                                    nn_table=mt.DNA_NN2,
-                                    de_table=mt.DNA_DE1,
-                                    imm_table=mt.DNA_IMM1,
-                                )
-                                # if melt > 20:
-                                #     print('Found non-specific match:'+fragment[i:i+len(primer)])
-                                #     print('                 primer:'+primer+' Tm:'+str(melt))
-                                if melt > 35:
-                                    non[1].append(True)
-                            except ValueError as valerr:
-                                # print(str(valerr)+". Please check position manually:"+str(i+1)+" reverse")
-                                # print('Primer:'+primer)
-                                # print('Match: '+fragment[i:i+len(primer)])
-                                pass
-                    if sum(non[0]) == 0 and sum(non[1]) == 0:
-                        break
-                    if sum(non[0]) > 0 and sum(non[1]) > 0:
-                        nonspecific.append([primername, fragname])
-                        print("Found Non-specific Amplification")
-    if nonspecific:
-        print("Nonspecific Primers: (Manually changing primer sequence recommended)")
-        print(nonspecific)
-    else:
-        print("No non-specific primers detected")
-
-def test_final_assembly(gene):
-    """Test that each oligo assembles properly and contains the designed mutation."""
-
-    # Check whether the enzyme is set.
-    if DIMPLE.enzyme:
-        if DIMPLE.enzyme == "BsmBI":
-            enzyme = BsmBI
-        elif DIMPLE.enzyme == "BsaI":
-            enzyme = BsaI
-        else:
-            logger.warn("Enzyme not recognized. Not performing assembly check.")
-            return None
-    else:
-        logger.warn("No enzyme set. Not performing assembly check.")
-        return None
-
-    n_fragments = len(gene.genePrimer) // 2
-    full_template = Dseqrecord(gene.seq, circular=True)
-
-    backbones = []
-    oligo_primer_dseqs = []
-    logger.info(f"Testing assembly for {gene.geneid}")
-    logger.info(f"Using enzyme: {DIMPLE.enzyme}")
-    logger.info(f"Number of fragments: {n_fragments}")
-
-    for frag in range(0, n_fragments):
-        fwd_primer = Dseqrecord(gene.genePrimer[frag * 2])
-        rev_primer = Dseqrecord(gene.genePrimer[frag * 2+1])
-        template_pcr_product = Dseqrecord(pcr(fwd_primer, rev_primer, full_template))
-        cut_template_product = max(template_pcr_product.cut(enzyme), key = len)
-        backbones.append(cut_template_product)
-
-        fwd_oligo_primer = Dseqrecord(gene.barPrimer[frag * 2])
-        rev_oligo_primer = Dseqrecord(gene.barPrimer[frag * 2+1])
-        oligo_primer_dseqs.append((fwd_oligo_primer, rev_oligo_primer))
-
-    for variant in gene.designed_variants:
-        variant_dict = gene.designed_variants[variant]
-        # Get the fragment that the variant is in.
-        fragment = variant_dict['fragment']
-        sequence = variant_dict['xfrag']
-        oligo_sequence = variant_dict['oligo_sequence']
-        # Simulate PCR of oligo with oligo primers.
-        fwd_oligo_primer, rev_oligo_primer = oligo_primer_dseqs[fragment-1]
-        oligo_pcr_product = Dseqrecord(pcr(fwd_oligo_primer, rev_oligo_primer, oligo_sequence))
-
-        try:
-            cut_oligo_product = max(oligo_pcr_product.cut(enzyme), key = len)
-        except ValueError as error:
-            logger.error(f"Oligo cut site issue: {variant}")
-            logger.error(str(error))
-
-        try:
-            assembled = (cut_oligo_product + backbones[fragment-1]).looped()
-            if str(sequence[4:-4]) not in str(assembled.seq):
-                logger.error(f"Assembly product incorrect: {variant}.")
-                logger.error(f"Expected variant to contain: {str(sequence[4:-4])}")
-                logger.error(f"Predicted assembly product: {str(assembled.seq)}")
-
-        except TypeError as error:
-            logger.error(f"Oligo does not assemble with template: {variant}")
-            logger.error(str(error))
+from DIMPLE.fragment_layout import (  # noqa: E402
+    check_overhangs,
+    recalculate_num_fragments,
+    switch_fragmentsize,
+)
+from DIMPLE.oligo_assembly import combine_fragments  # noqa: E402
+from DIMPLE.outputs import print_all  # noqa: E402
+from DIMPLE.primers import (  # noqa: E402
+    check_nonspecific,
+    find_fragment_primer,
+    find_geneprimer,
+)
+from DIMPLE.qc import post_qc, check_final_assembly  # noqa: E402
