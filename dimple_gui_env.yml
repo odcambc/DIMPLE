@@ -1,8 +1,9 @@
 name: dimple_gui_env
+# The GUI (run_dimple_gui.py) uses tkinter, which ships with the standard
+# Python distribution -- no extra GUI dependency required here.
 dependencies:
   - python=3.12
   - pip
-  - pyqt5
   - pip:
     - numpy==1.26.4
     - biopython==1.84
