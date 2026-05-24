@@ -152,6 +152,8 @@ def run_pipeline(
     dis: bool = False,
     match_sequences: bool = False,
     aminoacids: Optional[Sequence[str]] = None,
+    doublefrag: Optional[int] = None,
+    gene_primer_tm: Optional[tuple[int, int]] = None,
 ) -> Pool:
     """Drive the DIMPLE pipeline end-to-end against *target_file*.
 
@@ -176,10 +178,13 @@ def run_pipeline(
 
     pool = addgene(os.path.join(work_dir, target_file).strip(), config)
 
-    if aminoacids is not None:
-        apply_instance_settings(pool, config=config, aminoacids=list(aminoacids))
-    else:
-        apply_instance_settings(pool, config=config)
+    apply_instance_settings(
+        pool,
+        config=config,
+        aminoacids=list(aminoacids) if aminoacids is not None else None,
+        doublefrag=doublefrag,
+        gene_primer_tm=gene_primer_tm,
+    )
 
     if insertions:
         validate_insertions(list(insertions), config)
