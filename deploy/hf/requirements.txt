@@ -1,0 +1,4 @@
+biopython==1.84
+numpy==1.26.4
+pydna==5.4.0
+gradio>=4.0
