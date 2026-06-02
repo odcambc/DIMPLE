@@ -14,9 +14,11 @@ import shutil
 import pytest
 from Bio.Seq import Seq
 
-from DIMPLE.DIMPLE import addgene, generate_DMS_fragments
+from DIMPLE.DIMPLE import addgene, generate_DMS_fragments, post_qc, print_all
 from DIMPLE.pool import DimpleRuntimeConfig
 from DIMPLE.run_settings import compute_overlaps_and_maxfrag
+
+from ._helpers import assert_outputs_consistent
 
 _DELETIONS = [15, 30]
 _OVERLAP = 4
@@ -63,6 +65,10 @@ def test_long_deletions_kir(tmp_path, dimple_human_usage, kir_fa):
         False,  # dis
         wDir,
     )
+    post_qc(pool)
+    print_all(pool, wDir)
+
+    assert_outputs_consistent(tmp_path, "Kir", config)
 
     gene = pool[0]
 

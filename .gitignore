@@ -41,3 +41,10 @@ ipython_config.py
 .venv/
 venv/
 env/
+
+# DIMPLE generated outputs accidentally written to tests/ root by a stray run.
+# Goldens live in tests/expected/; fixtures in tests/data/ — both subdirs are
+# unaffected by these root-only globs.
+/tests/*.fasta
+/tests/*.csv
+/logs/

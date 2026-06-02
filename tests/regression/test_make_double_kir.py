@@ -23,9 +23,11 @@ import shutil
 import pytest
 from Bio.Seq import Seq
 
-from DIMPLE.DIMPLE import addgene, generate_DMS_fragments
+from DIMPLE.DIMPLE import addgene, generate_DMS_fragments, print_all
 from DIMPLE.pool import DimpleRuntimeConfig
 from DIMPLE.run_settings import apply_instance_settings
+
+from ._helpers import assert_outputs_consistent
 
 _OVERLAP = 3
 
@@ -70,6 +72,11 @@ def test_make_double_kir(tmp_path, dimple_human_usage, kir_fa):
         False,  # dis
         wDir,
     )
+    # post_qc skipped: barcode-primer specificity check is too slow on
+    # make_double oligo counts. print_all alone is enough to exercise the helper.
+    print_all(pool, wDir)
+
+    assert_outputs_consistent(tmp_path, "Kir", config)
 
     gene = pool[0]
 

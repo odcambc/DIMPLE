@@ -18,8 +18,10 @@ import shutil
 import pytest
 from Bio.Seq import Seq
 
-from DIMPLE.DIMPLE import addgene, generate_DMS_fragments
+from DIMPLE.DIMPLE import addgene, generate_DMS_fragments, post_qc, print_all
 from DIMPLE.pool import DimpleRuntimeConfig
+
+from ._helpers import assert_outputs_consistent
 
 # Default domain-insertion handle from run_dimple.py (BsaI-based, 24 nt).
 _HANDLE = "AGCGGGAGACCGGGGTCTCTGAGC"
@@ -68,6 +70,10 @@ def test_dis_pipeline_kir(tmp_path, dimple_human_usage, kir_fa):
         True,  # dis
         wDir,
     )
+    post_qc(pool)
+    print_all(pool, wDir)
+
+    assert_outputs_consistent(tmp_path, "Kir", config)
 
     gene = pool[0]
     # The crash being guarded: designed_variants is populated for DIS.

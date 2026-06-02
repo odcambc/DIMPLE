@@ -22,6 +22,8 @@ from Bio.Seq import Seq
 from DIMPLE.DIMPLE import addgene, generate_DMS_fragments, post_qc, print_all
 from DIMPLE.pool import DimpleRuntimeConfig
 
+from ._helpers import assert_outputs_consistent
+
 EXPECTED = Path(__file__).parent.parent / "expected"
 
 _GOLDEN_FILES = [
@@ -83,6 +85,8 @@ def test_dms_pipeline_kir(tmp_path, dimple_human_usage, kir_fa, update_golden):
     )
     post_qc(pool)
     print_all(pool, wDir)
+
+    assert_outputs_consistent(tmp_path, "Kir", config)
 
     if update_golden:
         for name in _GOLDEN_FILES:

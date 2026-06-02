@@ -706,66 +706,67 @@ def generate_DMS_fragments(
                                     "fragment": idx + 1,
                                     "xfrag": xfrag,
                                 }
-                        # if double mutations are selected then make every possible double mutation
-                        if pool.config.make_double:
-                            # select every permutation of mut_positions order doesn't matter
-                            for combi in itertools.combinations(mutations.keys(), 2):
-                                # extract number from mutation name
-                                if "STOP" not in combi[0] and "STOP" not in combi[1]:
-                                    pos1 = mut_positions[
-                                        positions.index(int(re.findall(r"\d+", combi[0])[0]))
-                                    ]
-                                    pos2 = mut_positions[
-                                        positions.index(int(re.findall(r"\d+", combi[1])[0]))
-                                    ]
-                                    if pos1 != pos2:
-                                        xfrag = (
-                                            tmpseq[0:pos1]
-                                            + mutations[combi[0]]
-                                            + tmpseq[pos1 + 3 : pos2]
-                                            + mutations[combi[1]]
-                                            + tmpseq[pos2 + 3 :]
+                    # Emit double mutations once per fragment, sibling of
+                    # `for i in mut_positions:` -- not nested inside it.
+                    # Iterating combinations(mutations) on every codon would
+                    # re-emit the full pair set on each pass.
+                    if pool.config.make_double:
+                        for combi in itertools.combinations(mutations.keys(), 2):
+                            if "STOP" not in combi[0] and "STOP" not in combi[1]:
+                                pos1 = mut_positions[
+                                    positions.index(int(re.findall(r"\d+", combi[0])[0]))
+                                ]
+                                pos2 = mut_positions[
+                                    positions.index(int(re.findall(r"\d+", combi[1])[0]))
+                                ]
+                                if pos1 != pos2:
+                                    xfrag = (
+                                        tmpseq[0:pos1]
+                                        + mutations[combi[0]]
+                                        + tmpseq[pos1 + 3 : pos2]
+                                        + mutations[combi[1]]
+                                        + tmpseq[pos2 + 3 :]
+                                    )
+                                    double_name = (
+                                        combi[0].strip(">") + "+" + combi[1].strip(">")
+                                    )
+                                    double_oligo_id = (
+                                        gene.geneid + "_DMS-" + str(idx + 1) + "_" + double_name
+                                    )
+                                    dms_sequences_double.append(
+                                        SeqRecord(
+                                            xfrag,
+                                            id=double_oligo_id,
+                                            description="Frag " + fragstart + "-" + fragend,
                                         )
-                                        double_name = (
-                                            combi[0].strip(">") + "+" + combi[1].strip(">")
-                                        )
-                                        double_oligo_id = (
-                                            gene.geneid + "_DMS-" + str(idx + 1) + "_" + double_name
-                                        )
-                                        dms_sequences_double.append(
-                                            SeqRecord(
-                                                xfrag,
-                                                id=double_oligo_id,
-                                                description="Frag " + fragstart + "-" + fragend,
-                                            )
-                                        )
-                                        # Register the double in designed_variants so the
-                                        # shared barcode-assembly loop can stamp the final
-                                        # oligo sequence onto it (same shape as the singles
-                                        # block at ~line 696 and the DIS registration fix).
-                                        gene.designed_variants[double_oligo_id] = {
-                                            "count": 0,
-                                            "pos": _aa_number(
-                                                pos1, frag[0], offset, pool.config.primer_buffer
-                                            ),
-                                            "mutation_type": "MM",
-                                            "name": double_name,
-                                            "codon": (
-                                                str(mutations[combi[0]])
-                                                + "+"
-                                                + str(mutations[combi[1]])
-                                            ),
-                                            "wt_codon": (
-                                                str(tmpseq[pos1 : pos1 + 3]).upper()
-                                                + "+"
-                                                + str(tmpseq[pos2 : pos2 + 3]).upper()
-                                            ),
-                                            "mutation": double_name,
-                                            "length": 2,
-                                            "hgvs": f"p.([{double_name}])",
-                                            "fragment": idx + 1,
-                                            "xfrag": xfrag,
-                                        }
+                                    )
+                                    # Register the double in designed_variants so the
+                                    # shared barcode-assembly loop can stamp the final
+                                    # oligo sequence onto it (same shape as the singles
+                                    # block above and the DIS registration fix).
+                                    gene.designed_variants[double_oligo_id] = {
+                                        "count": 0,
+                                        "pos": _aa_number(
+                                            pos1, frag[0], offset, pool.config.primer_buffer
+                                        ),
+                                        "mutation_type": "MM",
+                                        "name": double_name,
+                                        "codon": (
+                                            str(mutations[combi[0]])
+                                            + "+"
+                                            + str(mutations[combi[1]])
+                                        ),
+                                        "wt_codon": (
+                                            str(tmpseq[pos1 : pos1 + 3]).upper()
+                                            + "+"
+                                            + str(tmpseq[pos2 : pos2 + 3]).upper()
+                                        ),
+                                        "mutation": double_name,
+                                        "length": 2,
+                                        "hgvs": f"p.([{double_name}])",
+                                        "fragment": idx + 1,
+                                        "xfrag": xfrag,
+                                    }
                     # record mutation for analysis with NGS
                     # TODO: Don't append.
                     with open(
