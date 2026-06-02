@@ -20,8 +20,10 @@ import shutil
 import pytest
 from Bio.Seq import Seq
 
-from DIMPLE.DIMPLE import addgene, generate_DMS_fragments
+from DIMPLE.DIMPLE import addgene, generate_DMS_fragments, post_qc, print_all
 from DIMPLE.pool import DimpleRuntimeConfig
+
+from ._helpers import assert_outputs_consistent
 
 _HANDLE = "AGCGGGAGACCGGGGTCTCTGAGC"
 _OVERLAP = 3
@@ -67,6 +69,10 @@ def test_dms_dis_combined_kir(tmp_path, dimple_human_usage, kir_fa):
         True,  # dis
         wDir,
     )
+    post_qc(pool)
+    print_all(pool, wDir)
+
+    assert_outputs_consistent(tmp_path, "Kir", config)
 
     gene = pool[0]
 

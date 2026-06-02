@@ -108,23 +108,17 @@ def addgene(genefile, config: DimpleRuntimeConfig, start=None, end=None):
     pool = Pool(config)
     print("Barcode: " + str(config.barcode_f[0].seq))
     print("Number of barcodes: " + str(len(config.barcode_f)))
-    if start is None:
-        start = []
-    if end is None:
-        end = []
     tmpgene = list(SeqIO.parse(genefile.replace("\\", ""), "fasta"))
     tmpgene[0].seq = tmpgene[0].seq.upper()
     for gene in tmpgene:
+        gene.filename = genefile.replace("\\", "")
         if "start:" in gene.description and "end:" in gene.description:
-            start = int(gene.description.split("start:")[1].split(" ")[0]) - 1
-            end = int(gene.description.split("end:")[1].split(" ")[0])
-            gene.filename = genefile.replace("\\", "")
-            logger.info("Found start: " + str(start) + " and end: " + str(end))
-            logger.info("Inferred ORF sequence: " + str(gene.seq[start:end]))
-            logger.info("ORF translation: " + str(gene.seq[start:end].translate()))
-            instance = DIMPLE(gene, start, end, pool)
+            gene_start = int(gene.description.split("start:")[1].split(" ")[0]) - 1
+            gene_end = int(gene.description.split("end:")[1].split(" ")[0])
+            logger.info("Found start: " + str(gene_start) + " and end: " + str(gene_end))
+            logger.info("Inferred ORF sequence: " + str(gene.seq[gene_start:gene_end]))
+            logger.info("ORF translation: " + str(gene.seq[gene_start:gene_end].translate()))
         else:
-            gene.filename = genefile.replace("\\", "")
-            instance = DIMPLE(gene, start, end, pool)
-        pool.append(instance)
+            gene_start, gene_end = start, end
+        pool.append(DIMPLE(gene, gene_start, gene_end, pool))
     return pool
