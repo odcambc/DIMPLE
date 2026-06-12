@@ -1,23 +1,37 @@
 def parse_custom_mutations(mutation_text):
     custom_mutations = {}
-    for set in mutation_text:
-        set = set.split(":")
-        if set[1] == "All":
-            if "-" in set[0]:
-                for i in range(int(set[0].split("-")[0]), int(set[0].split("-")[1]) + 1):
-                    custom_mutations[i] = "A,C,D,E,F,G,H,I,K,L,M,N,P,Q,R,S,T,V,W,Y"
+    all_mutations = "A,C,D,E,F,G,H,I,K,L,M,N,P,Q,R,S,T,V,W,Y"
+
+    for raw_line in mutation_text:
+        line = raw_line.strip()
+        if not line:
+            continue
+        if ":" not in line:
+            raise ValueError(f"Custom mutation line must contain ':': {raw_line!r}")
+
+        position_text, mutation_value = [part.strip() for part in line.split(":", 1)]
+        if position_text.lower() in ("position", "positions"):
+            continue
+
+        if mutation_value == "All":
+            if "-" in position_text:
+                start, end = [int(x.strip()) for x in position_text.split("-", 1)]
+                for i in range(start, end + 1):
+                    custom_mutations[i] = all_mutations
             else:
-                custom_mutations[int(set[0])] = "A,C,D,E,F,G,H,I,K,L,M,N,P,Q,R,S,T,V,W,Y"
+                custom_mutations[int(position_text)] = all_mutations
         else:
-            if "-" in set[0]:
-                for i in range(int(set[0].split("-")[0]), int(set[0].split("-")[1]) + 1):
-                    custom_mutations[i] = set[1]
+            if "-" in position_text:
+                start, end = [int(x.strip()) for x in position_text.split("-", 1)]
+                for i in range(start, end + 1):
+                    custom_mutations[i] = mutation_value
             else:
                 # if mutation exists, add to it
-                if int(set[0]) in custom_mutations.keys():
-                    custom_mutations[int(set[0])] = custom_mutations[int(set[0])] + "," + set[1]
+                position = int(position_text)
+                if position in custom_mutations:
+                    custom_mutations[position] = custom_mutations[position] + "," + mutation_value
                 else:
-                    custom_mutations[int(set[0])] = set[1]
+                    custom_mutations[position] = mutation_value
     return custom_mutations
 
 

@@ -136,24 +136,25 @@ def run_dimple_job(
     if fasta_file is None:
         return None, "Error: please upload a FASTA gene file."
 
-    deletions = _parse_int_list(deletions_raw) if deletions_raw.strip() else False
-    insertions = _parse_str_list(insertions_raw) if insertions_raw.strip() else False
-
-    if not any([dms, dis, deletions, insertions]):
-        return None, (
-            "Error: select at least one mutation type " "(DMS, DIS, deletions, or insertions)."
-        )
-
-    # Isolated per-request work dir under the app-owned root; the uploaded FASTA
-    # is copied in under its own name so run_pipeline's
-    # os.path.join(work_dir, target_file) resolves.
-    JOBS_DIR.mkdir(parents=True, exist_ok=True)
-    work_dir = Path(tempfile.mkdtemp(prefix="job_", dir=JOBS_DIR))
-    src = Path(fasta_file)
-    gene_file = src.name
-    shutil.copy(src, work_dir / gene_file)
-
+    work_dir: Path | None = None
     try:
+        deletions = _parse_int_list(deletions_raw) if deletions_raw.strip() else False
+        insertions = _parse_str_list(insertions_raw) if insertions_raw.strip() else False
+
+        if not any([dms, dis, deletions, insertions]):
+            return None, (
+                "Error: select at least one mutation type " "(DMS, DIS, deletions, or insertions)."
+            )
+
+        # Isolated per-request work dir under the app-owned root; the uploaded FASTA
+        # is copied in under its own name so run_pipeline's
+        # os.path.join(work_dir, target_file) resolves.
+        JOBS_DIR.mkdir(parents=True, exist_ok=True)
+        work_dir = Path(tempfile.mkdtemp(prefix="job_", dir=JOBS_DIR))
+        src = Path(fasta_file)
+        gene_file = src.name
+        shutil.copy(src, work_dir / gene_file)
+
         frag = 0 if str(fragment_len).strip().lower() in ("", "auto") else int(fragment_len)
         seed = int(random_seed) if str(random_seed).strip() not in ("", "none") else None
         orf = int(orf_index) if str(orf_index).strip() not in ("", "none") else None
@@ -200,7 +201,8 @@ def run_dimple_job(
         )
     except Exception as exc:  # noqa: BLE001 - surface every failure as UI text
         logger.exception("DIMPLE web run failed")
-        shutil.rmtree(work_dir, ignore_errors=True)
+        if work_dir is not None:
+            shutil.rmtree(work_dir, ignore_errors=True)
         return None, "\n".join(log + [f"Error: {type(exc).__name__}: {exc}"])
 
     # The pipeline has read the upload; remove the raw gene FASTA now so the

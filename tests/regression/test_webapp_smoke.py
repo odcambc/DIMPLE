@@ -65,6 +65,18 @@ def test_run_job_rejects_no_mutation_type():
     assert "mutation type" in log
 
 
+def test_run_job_reports_bad_deletion_input(kir_fa):
+    """Malformed deletion text is returned as UI status, not raised."""
+    zip_path, log = webapp_app.run_dimple_job(
+        str(kir_fa),
+        dms=True,
+        **{**_BASE_KWARGS, "deletions_raw": "abc"},
+    )
+    assert zip_path is None
+    assert "Error: ValueError" in log
+    assert "abc" in log
+
+
 @pytest.mark.slow
 def test_run_job_kir_dms_produces_zip(tmp_path, kir_fa, monkeypatch):
     """End-to-end: Kir DMS run returns a zip with the expected members."""

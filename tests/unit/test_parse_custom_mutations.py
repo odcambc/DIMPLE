@@ -27,3 +27,7 @@ _ALL = "A,C,D,E,F,G,H,I,K,L,M,N,P,Q,R,S,T,V,W,Y"
 )
 def test_parse_custom_mutations(mutation_text, expected):
     assert parse_custom_mutations(mutation_text) == expected
+
+
+def test_parse_custom_mutations_skips_header_and_blank_lines():
+    assert parse_custom_mutations(["Positions:Mutations\n", "\n", "1:All\n"]) == {1: _ALL}
