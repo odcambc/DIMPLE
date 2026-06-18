@@ -1,6 +1,9 @@
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+# DIMPLE is an application you download and run, not a library you install.
+# `package = false` tells uv to sync the dependencies below into .venv without
+# building/installing DIMPLE itself as a wheel — the code runs in place from the
+# repo root. There is intentionally no [build-system] table.
+[tool.uv]
+package = false
 
 [project]
 name = "dimple"
@@ -27,9 +30,6 @@ dev = [
 web = [
     "gradio>=4.0",
 ]
-
-[tool.hatch.build.targets.wheel]
-packages = ["DIMPLE"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"

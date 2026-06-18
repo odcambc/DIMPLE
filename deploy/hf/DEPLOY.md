@@ -1,9 +1,10 @@
 # Deploy the DIMPLE web app to HuggingFace Spaces
 
 Target: a **public, no-login** Gradio Space. The Space is its own git repo; we
-push a curated subset of the project to it (app + code + Space-specific
-`requirements.txt`/`README.md`) so the upstream GitHub repo and its base
-`requirements.txt` stay untouched.
+push a curated subset of the project to it (app + code + a Space-specific
+`requirements.txt`/`README.md`). The main repo is uv/`pyproject.toml`-managed and
+ships no flat `requirements.txt`, so the Space carries its own (core deps +
+`gradio`) for HF's pip-based builder.
 
 ## What ships to the Space
 
@@ -70,8 +71,10 @@ the README front-matter and match it in `requirements.txt`.
 ## If you'd rather not maintain a separate Space repo
 
 Add the Space as a remote on a throwaway deploy branch of the main repo and push
-that — but then HF reads the *root* `requirements.txt` (no `gradio`) and the
-project `README.md` (no HF front-matter), so you'd have to add `gradio` to the
-root requirements and prepend the YAML front-matter to the root README. The
-curated-copy flow above avoids both edits.
+that — but the main repo ships no root `requirements.txt` (deps live in
+`pyproject.toml` / `uv.lock`), and its `README.md` has no HF front-matter. HF's
+Gradio builder wants a flat `requirements.txt`, so you'd have to add one (core
+deps + `gradio`) and prepend the YAML front-matter to the root README — i.e.
+re-create exactly what `deploy/hf/` already holds. The curated-copy flow above
+avoids polluting the repo root with deploy-only files.
 ```

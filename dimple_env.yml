@@ -1,8 +1,0 @@
-name: dimple_env
-dependencies:
-  - python=3.12
-  - pip
-  - pip:
-    - numpy==1.26.4
-    - biopython==1.84
-    - pydna==5.4.0

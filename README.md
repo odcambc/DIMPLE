@@ -22,47 +22,69 @@ Run DIMPLE in a [Google Colab](https://colab.research.google.com/github/coywil26
 
 #### Using uv (recommended)
 
-Use `uv` to create a local virtual environment and install the project plus
-dependencies from `pyproject.toml` and `uv.lock`.
+DIMPLE is an application you download and run, not a library you install. `uv`
+reads `pyproject.toml` + `uv.lock`, creates a local `.venv` with the locked
+dependencies, and runs the tool in place — no manual activation, no install of
+DIMPLE itself.
 
-Install and sync dependencies:
-
-```{bash}
-uv sync
-```
-
-Run commands in the environment:
+From a fresh clone, a single command bootstraps everything and runs:
 
 ```{bash}
 uv run python run_dimple.py -h
+```
+
+Other entrypoints work the same way:
+
+```{bash}
 uv run python run_dimple_gui.py
 uv run pytest
 ```
 
-#### Using Conda (alternative)
-
-Use the supplied Conda environment file to install and manage dependencies.
-This creates a new environment called `dimple_env`:
+To pre-create the environment without running anything (e.g. for the GUI/web
+extras), use `uv sync` with the relevant extra:
 
 ```{bash}
-conda env create -f dimple_env.yml
-conda activate dimple_env
+uv sync                 # core dependencies only
+uv sync --extra dev     # + test/lint tooling
+uv sync --extra web     # + Gradio web app
 ```
 
-#### Using pip requirements (alternative)
+#### Without uv
 
-DIMPLE requires the following packages:
+`pyproject.toml` is the single source of truth for dependencies, but DIMPLE is
+run in place rather than installed — there is intentionally no build backend, so
+`pip install .` / `pip install -e .` will **not** work. Instead, create a Python
+3.12 environment, install the dependencies into it, and run the scripts directly
+from the repo root.
 
-- python
-- numpy
-- biopython
-- tkinter (only required for GUI version)
-
-Install with:
+Using a plain virtual environment:
 
 ```{bash}
-python -m pip install -r requirements.txt
+python3.12 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install biopython==1.84 numpy==1.26.4 pydna==5.4.0
+python run_dimple.py -h
 ```
+
+Or with conda:
+
+```{bash}
+conda create -n dimple python=3.12
+conda activate dimple
+pip install biopython==1.84 numpy==1.26.4 pydna==5.4.0
+python run_dimple.py -h
+```
+
+To pull the pinned versions straight from `pyproject.toml` rather than copying
+them (keeps you in sync with the single source of truth):
+
+```{bash}
+pip install $(python -c "import tomllib; print(' '.join(tomllib.load(open('pyproject.toml','rb'))['project']['dependencies']))")
+```
+
+For the test/lint tooling or the Gradio web app, also install the matching
+optional dependencies declared under `[project.optional-dependencies]` in
+`pyproject.toml` (the `dev` and `web` extras, respectively).
 
 Note: DIMPLE has been tested on Python version 3.12. Biopython is currently incompatible with Python 3.13 in some cases, and we recommend using Python 3.12 for now.
 
@@ -218,6 +240,7 @@ This code is licensed under the terms of the MIT license: [License](LICENSE)
 
 Contributions and feedback are welcome. Please submit an issue or pull request.
 
-# Getting help
+## Getting help
 
-For any issues, please open an issue on the GitHub repository. For questions or feedback, email [Chris](https://www.wcoyotelab.com/members/).
+For any issues, please open an issue on the GitHub repository. For
+questions or feedback, [email Chris](https://www.waymentsteelelab.org).
