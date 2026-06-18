@@ -312,6 +312,10 @@ def generate_DMS_fragments(
         # missingTable = [[1]*gene.aacount]*gene.aacount
         missingFragments = []
         all_grouped_oligos = []
+        # Start the per-gene mutations CSV fresh: the per-fragment writes below
+        # append to it, so truncate once here instead of relying on an empty
+        # working directory (a re-run otherwise duplicates every row).
+        open(os.path.join(folder.replace("\\", ""), gene.geneid + "_mutations.csv"), "w").close()
         # Loop through each fragment
         while idx < len(gene.breaklist):
             if idx == 0:
@@ -727,9 +731,7 @@ def generate_DMS_fragments(
                                         + mutations[combi[1]]
                                         + tmpseq[pos2 + 3 :]
                                     )
-                                    double_name = (
-                                        combi[0].strip(">") + "+" + combi[1].strip(">")
-                                    )
+                                    double_name = combi[0].strip(">") + "+" + combi[1].strip(">")
                                     double_oligo_id = (
                                         gene.geneid + "_DMS-" + str(idx + 1) + "_" + double_name
                                     )
@@ -767,8 +769,8 @@ def generate_DMS_fragments(
                                         "fragment": idx + 1,
                                         "xfrag": xfrag,
                                     }
-                    # record mutation for analysis with NGS
-                    # TODO: Don't append.
+                    # record mutation for analysis with NGS (file truncated
+                    # once per gene above, so appending per fragment is correct)
                     with open(
                         os.path.join(folder.replace("\\", ""), gene.geneid + "_mutations.csv"),
                         "a",
@@ -854,8 +856,11 @@ def generate_DMS_fragments(
                             name = (
                                 f"{seq1(wt_pre_aa)}{pos}_{seq1(wt_post_aa)}{pos+1}_ins{insert_name}"
                             )
-                            # TODO: Insert length assumes that the insert is a multiple of 3
-                            # (i.e. codon insertions). Make more flexible.
+                            # Note: insert length is assumed to be a multiple of 3
+                            # (codon insertions) -- the `len(insert_n) // 3` below
+                            # counts inserted codons. Non-codon insertions are not
+                            # supported; the CLI/README document the multiple-of-3
+                            # requirement for insertions.
                             gene.designed_variants[oligo_id] = {
                                 "count": 0,
                                 "pos": pos,
@@ -872,10 +877,6 @@ def generate_DMS_fragments(
                 ### Scanning Deletions
                 if delete:
                     # deletion
-                    # TODO: failing here, for some reason. i becomes too large.
-                    # fragment lengths are too high? no.
-                    # overlaps are too small for larger deletion sizes. why?
-
                     # Iterate over codon boundaries in the fragment
                     # Shifted down by 3 to avoid long deletions running into the primer
                     # binding region
