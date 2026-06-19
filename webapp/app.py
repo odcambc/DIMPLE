@@ -13,8 +13,11 @@ Design notes (see ``tasks/webapp.md``):
   comes from the FASTA ``start:/end:`` header or the explicit ORF-index field.
 * **Per-request temp dir.** Each run gets a fresh ``tempfile.mkdtemp`` work dir;
   ``run_pipeline`` reads/writes files there and we zip the results out.
-* This is the fast-demo layer. Out-of-process execution, upload-size caps, and a
-  hard wall-clock timeout are the step-4 robustness items, not done here.
+* Per-request isolation, a TTL reaper, and an upload-size cap are in place (see
+  below). Still deferred: out-of-process execution and a hard wall-clock timeout.
+  These two are coupled -- a timeout that can actually stop a runaway CPU-bound
+  job needs a killable child process (a thread can't be force-killed), so they
+  should land together rather than as a soft (non-enforcing) timeout now.
 """
 
 from __future__ import annotations

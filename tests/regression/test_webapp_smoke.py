@@ -77,6 +77,29 @@ def test_run_job_reports_bad_deletion_input(kir_fa):
     assert "abc" in log
 
 
+def test_run_job_reports_ambiguous_orf(tmp_path, monkeypatch):
+    """Ambiguous ORF + no header coords -> clean error, not a hang or traceback.
+
+    The web layer forces ``non_interactive=True``, so ``findORF`` can't prompt
+    for which ORF to use; ``addgene`` raises and ``run_dimple_job`` must surface
+    it as UI text. Guards the headless contract end-to-end through the wrapper --
+    the failure mode here would be a server hang on an ``input()`` prompt.
+    """
+    # Confine the (created-then-cleaned-up) work dir to tmp_path.
+    monkeypatch.setattr(webapp_app, "JOBS_DIR", tmp_path / "jobs")
+
+    # Two equally-good ORFs and no start:/end: header -> "Multiple ORF candidates".
+    ambiguous = "ATG" + "GCC" * 101 + "TAA" + "ATG" + "GCC" * 101 + "TAA"
+    fa = tmp_path / "ambiguous_orf.fa"
+    fa.write_text(f">ambiguous_orf\n{ambiguous}\n")
+
+    zip_path, log = webapp_app.run_dimple_job(str(fa), dms=True, **_BASE_KWARGS)
+
+    assert zip_path is None
+    assert "Error: ValueError" in log
+    assert "orf" in log.lower()
+
+
 @pytest.mark.slow
 def test_run_job_kir_dms_produces_zip(tmp_path, kir_fa, monkeypatch):
     """End-to-end: Kir DMS run returns a zip with the expected members."""
