@@ -37,6 +37,19 @@ are unchanged. Regression goldens were regenerated (see *maxfrag* below).
   these read `pool.config` internally. The DMS checkbox also now actually
   launches selected (a `deselect()` at widget creation had been overriding the
   default-on behavior).
+- **Non-specific-primer QC failures now explain themselves.** When the
+  enzyme-specific assembly check finds a gene/oligo primer that anneals at more
+  than one site, it previously aborted with pydna's raw `PCR not specific!`
+  error. It now re-raises an actionable message naming the gene/fragment and
+  pointing at the fix (longer oligo length or adjusted Tm). Deeper handling
+  (test coverage of the enzyme-set path; skip-and-continue for multi-gene runs)
+  is tracked as a follow-up.
+- **GUI / notebook "include stop codons" now works.** `addgene` appends `STOP`
+  to the amino-acid scan list when stop codons are enabled, but the GUI and
+  notebook passed an explicit amino-acid list to `apply_instance_settings` that
+  overwrote it — so the stop-codon toggle silently produced no stop variants
+  (the CLI was unaffected). `apply_instance_settings` now re-appends `STOP` when
+  the flag is set.
 - **GUI pipeline errors now surface.** The whole run pipeline is wrapped so
   errors (e.g. the common "unwanted restriction site" `ValueError`) appear in a
   message box and the output log instead of vanishing to stderr behind a blank

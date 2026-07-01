@@ -236,6 +236,20 @@ class TestRunSettings(unittest.TestCase):
             apply_instance_settings([g], cfg, doublefrag=1)
         self.assertIn("doublefrag=1", str(ctx.exception))
 
+    def test_apply_instance_settings_reappends_stop_when_stop_codon(self) -> None:
+        # An explicit aminoacids list (GUI/notebook) must not drop the STOP that
+        # stop_codon scanning depends on -- addgene adds it, this must keep it.
+        cfg = DimpleRuntimeConfig(stop_codon=True)
+        g = _FakeGene()
+        apply_instance_settings([g], cfg, aminoacids=["Cys", "Asp"])
+        self.assertIn("STOP", g.aminoacids)
+
+    def test_apply_instance_settings_no_stop_when_flag_off(self) -> None:
+        cfg = DimpleRuntimeConfig(stop_codon=False)
+        g = _FakeGene()
+        apply_instance_settings([g], cfg, aminoacids=["Cys", "Asp"])
+        self.assertNotIn("STOP", g.aminoacids)
+
     def test_apply_instance_settings_noops_when_none(self) -> None:
         cfg = DimpleRuntimeConfig()
         g = _FakeGene()

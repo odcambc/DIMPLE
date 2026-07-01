@@ -151,6 +151,28 @@ def post_qc(pool):
         print("No non-specific primers detected")
 
 
+def _pcr_or_friendly_error(fwd, rev, template, gene_id, context):
+    """Simulate PCR, re-raising pydna's raw failure as actionable DIMPLE guidance.
+
+    pydna raises a bare ``PCR not specific! ... anneals ... at N`` (or a no-product)
+    error that gives a DIMPLE user no lever. This names the gene/fragment and points
+    at the fix -- a designed primer that anneals at more than one site usually means
+    the oligo is too short to place a unique primer; a longer oligo (or adjusted
+    gene-primer Tm) resolves it.
+    """
+    try:
+        product = pcr(fwd, rev, template)
+    except Exception as exc:  # pydna raises ValueError for non-specific / no product
+        raise ValueError(
+            f"Primer specificity check failed for {gene_id} ({context}): a designed "
+            f"primer anneals at more than one site, so the fragment cannot be "
+            f"amplified cleanly. This usually means the oligo length is too short to "
+            f"place a unique primer -- try a longer oligo length, or adjust the "
+            f"gene-primer Tm bounds. (pydna: {exc})"
+        ) from exc
+    return Dseqrecord(product)
+
+
 def check_final_assembly(gene):
     """Test that each oligo assembles properly and contains the designed mutation."""
 
@@ -180,7 +202,9 @@ def check_final_assembly(gene):
     for frag in range(0, n_fragments):
         fwd_primer = Dseqrecord(gene.genePrimer[frag * 2])
         rev_primer = Dseqrecord(gene.genePrimer[frag * 2 + 1])
-        template_pcr_product = Dseqrecord(pcr(fwd_primer, rev_primer, full_template))
+        template_pcr_product = _pcr_or_friendly_error(
+            fwd_primer, rev_primer, full_template, gene.geneid, f"gene primer, fragment {frag + 1}"
+        )
         cut_template_product = max(template_pcr_product.cut(enzyme), key=len)
         backbones.append(cut_template_product)
 
@@ -196,7 +220,13 @@ def check_final_assembly(gene):
         oligo_sequence = variant_dict["oligo_sequence"]
         # Simulate PCR of oligo with oligo primers.
         fwd_oligo_primer, rev_oligo_primer = oligo_primer_dseqs[fragment - 1]
-        oligo_pcr_product = Dseqrecord(pcr(fwd_oligo_primer, rev_oligo_primer, oligo_sequence))
+        oligo_pcr_product = _pcr_or_friendly_error(
+            fwd_oligo_primer,
+            rev_oligo_primer,
+            oligo_sequence,
+            gene.geneid,
+            f"oligo primer, variant {variant}",
+        )
 
         try:
             cut_oligo_product = max(oligo_pcr_product.cut(enzyme), key=len)

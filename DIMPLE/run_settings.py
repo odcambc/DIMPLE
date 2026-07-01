@@ -334,6 +334,13 @@ def apply_instance_settings(
     for gene in instances:
         if aminoacids is not None:
             gene.aminoacids = [a.strip() for a in aminoacids]
+            # addgene appends STOP to gene.aminoacids when stop_codon is set;
+            # an explicit aminoacids list (the GUI substitutions field, the
+            # notebook) overwrites that and would silently drop stop-codon
+            # scanning. Re-append it so "include stop codons" actually works.
+            # The CLI passes aminoacids=None and skips this whole branch.
+            if config.stop_codon and "STOP" not in gene.aminoacids:
+                gene.aminoacids.append("STOP")
         if doublefrag is not None:
             if int(doublefrag) == 1:
                 raise NotImplementedError(
