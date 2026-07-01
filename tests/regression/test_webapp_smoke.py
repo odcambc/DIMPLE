@@ -37,7 +37,7 @@ _BASE_KWARGS = dict(
     tm_low=58,
     tm_high=62,
     orf_index="",
-    random_seed="1",
+    random_seed="1848",
 )
 
 _EXPECTED_ZIP_MEMBERS = {
