@@ -31,15 +31,15 @@ def build_parser() -> argparse.ArgumentParser:
         "-handle",
         default="AGCGGGAGACCGGGGTCTCTGAGC",
         help=(
-            "Genetic handle for domain insertion. This is important for defining the "
-            "linker. Currently uses BsaI (4 base overhang), but this can be swapped "
-            "for SapI (3 base overhang)."
+            "Genetic handle (linker) sequence that -dis inserts at every position. "
+            "Important for defining the linker. Currently uses BsaI (4 base overhang), "
+            "but this can be swapped for SapI (3 base overhang)."
         ),
     )
     parser.add_argument(
         "-dis",
         action="store_true",
-        help="use the handle to insert domains at every position in POI",
+        help="Domain-insertion scan: insert the -handle sequence at every position in the ORF.",
     )
     parser.add_argument(
         "-matchSequences",
