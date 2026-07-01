@@ -19,7 +19,7 @@ from webapp import app as webapp_app  # noqa: E402 - must follow importorskip
 
 # Keyword args shared by the happy-path calls; mirrors the form defaults.
 _BASE_KWARGS = dict(
-    oligo_len=230,
+    oligo_len=250,
     fragment_len="auto",
     overlap=4,
     dis=False,
