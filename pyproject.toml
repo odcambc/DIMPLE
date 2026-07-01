@@ -7,11 +7,11 @@ package = false
 
 [project]
 name = "dimple"
-version = "0.1.0"
+version = "1.1.0"
 description = "Deep Indel Missense Programmable Library Engineering"
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "biopython==1.84",
     "numpy==1.26.4",

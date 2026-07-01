@@ -31,7 +31,7 @@ from Bio.Seq import Seq
 from DIMPLE.DIMPLE import addgene, align_genevariation
 from DIMPLE.pool import DimpleRuntimeConfig
 
-_OVERLAP = 3
+_OVERLAP = 4
 _FIXTURE = Path(__file__).parent.parent / "data" / "Kir_pair.fa"
 
 
@@ -45,8 +45,8 @@ def test_align_genevariation_links_homologs(tmp_path, dimple_human_usage):
     config = DimpleRuntimeConfig(
         handle="",
         synth_len=230,
-        maxfrag=230 - 62 - _OVERLAP,
-        primer_buffer=30 + _OVERLAP,
+        maxfrag=230 - 64 - _OVERLAP - _OVERLAP,  # synth_len - 64 - overlap_l - overlap_r
+        primer_buffer=30 + _OVERLAP,  # PRIMER_BUFFER_BASE + overlap = 34
         dms=True,
         stop_codon=False,
         make_double=False,
@@ -79,6 +79,15 @@ def test_align_genevariation_links_homologs(tmp_path, dimple_human_usage):
     assert (
         kir.breaklist == homolog.breaklist
     ), "linked genes should share breaklist after align_genevariation"
+
+    # Regression (overlap=4): breaksites must stay frame-aligned to primer_buffer,
+    # the invariant the breaksites setter enforces ((s - primer_buffer) % 3 == 0).
+    # At overlap=4 primer_buffer=34 (not a multiple of 3); pre-fix the snap grid
+    # used bare multiples of 3, landing an off-frame breaksite that raised.
+    pb = pool.config.primer_buffer
+    assert all(
+        (s - pb) % 3 == 0 for s in kir.breaksites
+    ), f"breaksites not frame-aligned to primer_buffer={pb}: {kir.breaksites}"
 
     # unique_Frag populated and well-shaped per gene.
     assert hasattr(kir, "unique_Frag") and hasattr(homolog, "unique_Frag")

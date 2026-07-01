@@ -5,7 +5,7 @@ import argparse
 import logging
 from datetime import datetime
 
-from DIMPLE.run_settings import configure_dimple_logging
+from DIMPLE.run_settings import configure_dimple_logging, resolve_random_seed
 from DIMPLE.runner import build_runtime_config, run_pipeline
 from DIMPLE.utilities import parse_custom_mutations
 
@@ -54,8 +54,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-oligoLen",
         type=int,
-        default=230,
-        help="Synthesized oligo length",
+        default=250,
+        help="Total synthesized oligo length (nt), i.e. the full oligo your "
+        "synthesis vendor makes; the usable mutagenic fragment is this minus "
+        "fixed primer/cutsite overhead",
     )
     parser.add_argument(
         "-fragmentLen",
@@ -74,10 +76,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "-DMS",
+        "-include_substitutions",
         action="store_const",
         const=True,
         default=False,
-        help="Choose if you will run deep deep mutation scan",
+        dest="DMS",
+        help=(
+            "Run a deep mutational (substitution) scan. -include_substitutions is "
+            "an alias, matching the GUI's checkbox name for the same toggle."
+        ),
     )
     parser.add_argument(
         "-custom_mutations",
@@ -107,11 +114,6 @@ def build_parser() -> argparse.ArgumentParser:
             "(it will make deletions in multiples of 2x). Note you should enter "
             "multiples of 3 to maintain reading frame"
         ),
-    )
-    parser.add_argument(
-        "-include_substitutions",
-        default=False,
-        help="If you are running DMS but only want to insert or delete AA",
     )
     parser.add_argument(
         "-barcode_start",
@@ -167,7 +169,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "-seed",
-        help="Seed for random number generation",
+        help="Seed for random number generation (default: 1848 for reproducible "
+        "output; pass any integer, including 0, to vary the library)",
         default=None,
     )
     parser.add_argument(
@@ -243,7 +246,7 @@ def main(argv=None) -> None:
         preferred_orf_index=args.orf_index,
         link_policy=link_policy,
         breaksite_change_policy=args.breaksite_change_policy,
-        random_seed=int(args.seed) if args.seed else None,
+        random_seed=resolve_random_seed(args.seed),
         logger=logger,
     )
 

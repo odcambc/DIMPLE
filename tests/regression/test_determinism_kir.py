@@ -25,7 +25,7 @@ from Bio.Seq import Seq
 from DIMPLE.DIMPLE import addgene, generate_DMS_fragments, post_qc, print_all
 from DIMPLE.pool import DimpleRuntimeConfig
 
-_OVERLAP = 3
+_OVERLAP = 4
 _SEED = 1848
 
 
@@ -38,8 +38,8 @@ def _run(work_dir: Path, gene_file: Path, usage: dict) -> None:
     config = DimpleRuntimeConfig(
         handle="",
         synth_len=230,
-        maxfrag=230 - 62 - _OVERLAP,
-        primer_buffer=30 + _OVERLAP,
+        maxfrag=230 - 64 - _OVERLAP - _OVERLAP,  # synth_len - 64 - overlap_l - overlap_r
+        primer_buffer=30 + _OVERLAP,  # PRIMER_BUFFER_BASE + overlap = 34
         dms=True,
         stop_codon=True,
         make_double=False,

@@ -38,6 +38,7 @@ os.environ.setdefault("GRADIO_ANALYTICS_ENABLED", "False")
 
 import gradio as gr  # noqa: E402  (must follow the env var above)
 
+from DIMPLE.run_settings import resolve_random_seed  # noqa: E402
 from DIMPLE.runner import build_runtime_config, run_pipeline  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -159,7 +160,7 @@ def run_dimple_job(
         shutil.copy(src, work_dir / gene_file)
 
         frag = 0 if str(fragment_len).strip().lower() in ("", "auto") else int(fragment_len)
-        seed = int(random_seed) if str(random_seed).strip() not in ("", "none") else None
+        seed = resolve_random_seed(random_seed)
         orf = int(orf_index) if str(orf_index).strip() not in ("", "none") else None
 
         config, overlap_l, overlap_r = build_runtime_config(
@@ -278,7 +279,9 @@ def build_interface() -> gr.Blocks:
                 )
 
                 with gr.Accordion("Core parameters", open=True):
-                    oligo_len = gr.Number(label="Oligo length", value=230, precision=0)
+                    oligo_len = gr.Number(
+                        label="Oligo length (total synthesized nt)", value=250, precision=0
+                    )
                     overlap = gr.Number(label="Fragment overlap (nt)", value=4, precision=0)
                     fragment_len = gr.Textbox(label="Fragment length (or 'auto')", value="auto")
                     restriction_sequence = gr.Textbox(
@@ -306,7 +309,9 @@ def build_interface() -> gr.Blocks:
                     tm_low = gr.Number(label="Gene primer Tm (low)", value=58, precision=0)
                     tm_high = gr.Number(label="Gene primer Tm (high)", value=62, precision=0)
                     orf_index = gr.Textbox(label="Preferred ORF index (blank = auto)", value="")
-                    random_seed = gr.Textbox(label="Random seed (blank = none)", value="1")
+                    random_seed = gr.Textbox(
+                        label="Random seed (blank = default 1848)", value="1848"
+                    )
 
                 run_btn = gr.Button("Design library", variant="primary")
 

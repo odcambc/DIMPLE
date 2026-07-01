@@ -1,3 +1,23 @@
+def _merge_custom_mutation(custom_mutations, position, value):
+    """Accumulate ``value`` (comma-separated AA codes) into ``position``.
+
+    Both single-position and range lines route through here so they behave
+    identically: new codes are appended (insertion order preserved) and
+    duplicates are dropped. This makes the result independent of line order —
+    previously ranges assigned unconditionally while singles accumulated, so an
+    overlapping range-after-single silently overwrote the single (e.g. ``3:C``
+    then ``1-5:A`` dropped the ``C``).
+    """
+    if position not in custom_mutations:
+        custom_mutations[position] = value
+        return
+    existing = custom_mutations[position].split(",")
+    for aa in value.split(","):
+        if aa not in existing:
+            existing.append(aa)
+    custom_mutations[position] = ",".join(existing)
+
+
 def parse_custom_mutations(mutation_text):
     custom_mutations = {}
     all_mutations = "A,C,D,E,F,G,H,I,K,L,M,N,P,Q,R,S,T,V,W,Y"
@@ -13,25 +33,14 @@ def parse_custom_mutations(mutation_text):
         if position_text.lower() in ("position", "positions"):
             continue
 
-        if mutation_value == "All":
-            if "-" in position_text:
-                start, end = [int(x.strip()) for x in position_text.split("-", 1)]
-                for i in range(start, end + 1):
-                    custom_mutations[i] = all_mutations
-            else:
-                custom_mutations[int(position_text)] = all_mutations
+        value = all_mutations if mutation_value == "All" else mutation_value
+
+        if "-" in position_text:
+            start, end = [int(x.strip()) for x in position_text.split("-", 1)]
+            for i in range(start, end + 1):
+                _merge_custom_mutation(custom_mutations, i, value)
         else:
-            if "-" in position_text:
-                start, end = [int(x.strip()) for x in position_text.split("-", 1)]
-                for i in range(start, end + 1):
-                    custom_mutations[i] = mutation_value
-            else:
-                # if mutation exists, add to it
-                position = int(position_text)
-                if position in custom_mutations:
-                    custom_mutations[position] = custom_mutations[position] + "," + mutation_value
-                else:
-                    custom_mutations[position] = mutation_value
+            _merge_custom_mutation(custom_mutations, int(position_text), value)
     return custom_mutations
 
 

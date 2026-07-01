@@ -170,9 +170,18 @@ def align_genevariation(pool):
             for x in fragsize:
                 total += x
                 breaksites.extend([total])
+            # Snap-target grid must sit in the same reading frame the breaksites
+            # setter enforces: (site - primer_buffer) % 3 == 0. Start the grid at
+            # primer_buffer % 3 (not 0) so it stays frame-aligned when
+            # primer_buffer isn't itself a multiple of 3 (e.g. overlap=4 →
+            # primer_buffer=34). At overlap=3 (primer_buffer=33) this is a no-op.
             available_sites = [
                 xsite
-                for xsite in range(0, max_gene_len + pool.config.primer_buffer + 1, 3)
+                for xsite in range(
+                    pool.config.primer_buffer % 3,
+                    max_gene_len + pool.config.primer_buffer + 1,
+                    3,
+                )
                 if xsite not in problemsites
             ]
             breaksites = [
@@ -312,10 +321,18 @@ def generate_DMS_fragments(
         # missingTable = [[1]*gene.aacount]*gene.aacount
         missingFragments = []
         all_grouped_oligos = []
-        # Start the per-gene mutations CSV fresh: the per-fragment writes below
-        # append to it, so truncate once here instead of relying on an empty
-        # working directory (a re-run otherwise duplicates every row).
-        open(os.path.join(folder.replace("\\", ""), gene.geneid + "_mutations.csv"), "w").close()
+        # Start the per-gene mutations CSV fresh, but only for DMS runs: the
+        # per-fragment writes below are DMS-gated and append to it, so truncate
+        # once here (a re-run otherwise duplicates every row). The mutations
+        # file is a DMS-substitutions-only artifact (insertions/deletions go to
+        # designed_variants.csv, and synonymous exist only within the DMS
+        # block), so a non-DMS run has nothing to put here; skip creation
+        # entirely rather than shipping a zero-byte file.
+        if dms:
+            with open(
+                os.path.join(folder.replace("\\", ""), gene.geneid + "_mutations.csv"), "w"
+            ):
+                pass
         # Loop through each fragment
         while idx < len(gene.breaklist):
             if idx == 0:
@@ -897,12 +914,20 @@ def generate_DMS_fragments(
                         ]
 
                         for delete_n in delete:
-                            # Check if deletion extends beyond ORF.
-                            if pos + delete_n > len(gene.seq) / 3:
+                            # Check if deletion extends beyond ORF. pos is an AA
+                            # index while delete_n is a nucleotide count, so
+                            # convert delete_n to codons and compare against the
+                            # clean ORF codon count. The old check used
+                            # len(gene.seq) / 3, which is primer-buffer-inflated
+                            # (gene.seq spans the ORF ± primer_buffer), so the
+                            # guard never fired. This is advisory only: the
+                            # variant is still emitted (a caller may intend a
+                            # C-terminal truncation), but the warning now
+                            # actually surfaces.
+                            if pos + delete_n // 3 > gene.aacount:
                                 logger.warning(
                                     "Deletion extends beyond ORF: " + f"D{pos}_{delete_n}"
                                 )
-                                pass
                             # Check if deletion extends beyond the fragment.
                             if delete_n + i > len(tmpseq):
                                 print("overlap: ", overlapL)

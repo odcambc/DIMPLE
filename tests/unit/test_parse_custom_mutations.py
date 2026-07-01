@@ -23,6 +23,22 @@ _ALL = "A,C,D,E,F,G,H,I,K,L,M,N,P,Q,R,S,T,V,W,Y"
             ["1-3:All", "5:M"],
             {1: _ALL, 2: _ALL, 3: _ALL, 5: "M"},
         ),
+        # overlapping single-then-range: the range must accumulate onto the
+        # single, not overwrite it (previously dropped the C at position 3).
+        (
+            ["3:C", "1-5:A"],
+            {1: "A", 2: "A", 3: "C,A", 4: "A", 5: "A"},
+        ),
+        # overlapping range-then-single: symmetric — no residue lost either way.
+        (
+            ["1-5:A", "3:C"],
+            {1: "A", 2: "A", 3: "A,C", 4: "A", 5: "A"},
+        ),
+        # duplicate residue across overlapping lines is de-duped, not doubled.
+        (
+            ["10:A", "8-12:A"],
+            {8: "A", 9: "A", 10: "A", 11: "A", 12: "A"},
+        ),
     ],
 )
 def test_parse_custom_mutations(mutation_text, expected):

@@ -29,7 +29,7 @@ from DIMPLE.run_settings import apply_instance_settings
 
 from ._helpers import assert_outputs_consistent
 
-_OVERLAP = 3
+_OVERLAP = 4
 
 
 @pytest.mark.slow
@@ -41,8 +41,8 @@ def test_make_double_kir(tmp_path, dimple_human_usage, kir_fa):
     config = DimpleRuntimeConfig(
         handle="",
         synth_len=230,
-        maxfrag=230 - 62 - _OVERLAP,
-        primer_buffer=30 + _OVERLAP,
+        maxfrag=230 - 64 - _OVERLAP - _OVERLAP,  # synth_len - 64 - overlap_l - overlap_r
+        primer_buffer=30 + _OVERLAP,  # PRIMER_BUFFER_BASE + overlap = 34
         dms=True,
         stop_codon=False,
         make_double=True,

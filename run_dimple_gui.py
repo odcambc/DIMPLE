@@ -17,8 +17,8 @@ from DIMPLE.DIMPLE import (
     print_all,
     switch_fragmentsize,
 )
+from DIMPLE.pool import DEFAULT_RANDOM_SEED
 from DIMPLE.run_settings import (
-    DEFAULT_GUI_RANDOM_SEED,
     apply_instance_settings,
     configure_dimple_logging,
     validate_insertions,
@@ -129,7 +129,7 @@ def run():
             preferred_orf_index=None,
             link_policy="prompt",
             breaksite_change_policy="prompt",
-            random_seed=DEFAULT_GUI_RANDOM_SEED,
+            random_seed=DEFAULT_RANDOM_SEED,
             logger=logger,
         )
     except (ValueError, IndexError) as exc:
@@ -148,55 +148,67 @@ def run():
         app.output_text.insert(tk.END, f"Using restriction enzyme {runtime_config.enzyme}\n")
     app.output_text.insert(tk.END, f"Using restriction sequence {runtime_config.cutsite}\n")
 
-    pool = addgene(app.geneFile, runtime_config)
+    # Wrap the whole pipeline so any failure surfaces in a messagebox + the
+    # output box rather than escaping to stderr and leaving the window
+    # apparently idle. The common case is addgene raising
+    # ValueError("Unwanted Restriction cut sites found ...") because the
+    # default avoid list (BsmBI/BsaI) still matches the plasmid.
+    try:
+        pool = addgene(app.geneFile, runtime_config)
 
-    apply_instance_settings(
-        pool,
-        aminoacids=app.substitutions.get().split(","),
-        doublefrag=app.doublefrag.get(),
-        gene_primer_tm=(
-            int(app.melting_temp_low.get()),
-            int(app.melting_temp_high.get()),
-        ),
-        config=runtime_config,
-    )
-    if app.avoid_breaksites.get():
-        pool[0].problemsites = set(int(x) for x in app.custom_mutations.keys())
-        # add extras
-        if app.avoid_others_list.get() != "":
-            pool[0].problemsites.update([int(x) for x in app.avoid_others_list.get().split(",")])
-        for i in range(len(pool[0].breaksites)):
-            switch_fragmentsize(pool[0], 1, pool)
+        apply_instance_settings(
+            pool,
+            aminoacids=app.substitutions.get().split(","),
+            doublefrag=app.doublefrag.get(),
+            gene_primer_tm=(
+                int(app.melting_temp_low.get()),
+                int(app.melting_temp_high.get()),
+            ),
+            config=runtime_config,
+        )
+        if app.avoid_breaksites.get():
+            pool[0].problemsites = set(int(x) for x in app.custom_mutations.keys())
+            # add extras
+            if app.avoid_others_list.get() != "":
+                pool[0].problemsites.update(
+                    [int(x) for x in app.avoid_others_list.get().split(",")]
+                )
+            for i in range(len(pool[0].breaksites)):
+                switch_fragmentsize(pool[0], 1, pool)
 
-    if app.matchSequences.get() == "match":
-        align_genevariation(pool)
+        if app.matchSequences.get() == "match":
+            align_genevariation(pool)
 
-    logger.info("Generating DMS fragments")
-    app.output_text.insert(tk.END, "Generating DMS fragments\n")
+        logger.info("Generating DMS fragments")
+        app.output_text.insert(tk.END, "Generating DMS fragments\n")
 
-    # Generate DMS fragments
-    generate_DMS_fragments(
-        pool,
-        overlap_l,
-        overlap_r,
-        app.synonymous.get(),
-        app.custom_mutations,
-        app.include_substitutions.get(),
-        insertions,
-        deletions,
-        app.dis.get(),
-        app.wDir,
-        config=runtime_config,
-    )
+        # Generate DMS fragments
+        generate_DMS_fragments(
+            pool,
+            overlap_l,
+            overlap_r,
+            app.synonymous.get(),
+            app.custom_mutations,
+            app.include_substitutions.get(),
+            insertions,
+            deletions,
+            app.dis.get(),
+            app.wDir,
+        )
 
-    # Post QC checks and saving
-    app.output_text.insert(tk.END, "Post QC checks and saving\n")
-    post_qc(pool, config=runtime_config)
-    print_all(pool, app.wDir, config=runtime_config)
+        # Post QC checks and saving
+        app.output_text.insert(tk.END, "Post QC checks and saving\n")
+        post_qc(pool)
+        print_all(pool, app.wDir)
 
-    logger.info("Finished")
-    app.output_text.insert(tk.END, "Finished\n")
-    app.output_text.insert(tk.END, f"Log file saved to {log_file}\n")
+        logger.info("Finished")
+        app.output_text.insert(tk.END, "Finished\n")
+        app.output_text.insert(tk.END, f"Log file saved to {log_file}\n")
+    except Exception as exc:
+        app.output_text.insert(tk.END, f"Error during run: {exc}\n")
+        messagebox.showerror("DIMPLE run error", str(exc))
+        logger.exception("Pipeline failed")
+        raise
 
     # Output all parameters to log
 
@@ -213,7 +225,10 @@ class Application(tk.Frame):
         self.matchSequences = tk.IntVar()
         self.mutationType = tk.IntVar()
         self.usage = tk.IntVar()
-        self.include_substitutions = tk.IntVar()
+        # DMS (deep mutational scan) is the core mode, so default it on — matches
+        # the web form and notebook, which also pre-select DMS. The CLI stays an
+        # explicit -DMS toggle (advanced/scriptable surface).
+        self.include_substitutions = tk.IntVar(value=1)
         self.delete = tk.IntVar()
         self.insert = tk.IntVar()
         self.stop = tk.IntVar()
@@ -405,7 +420,9 @@ class Application(tk.Frame):
             self, text="Deep Mutational Scan", variable=self.include_substitutions
         )
         self.include_sub_check.pack()
-        self.include_sub_check.deselect()
+        # No .deselect() here: DMS is the core mode and defaults on (the
+        # IntVar is initialized to 1). deselect() would force the widget's
+        # variable back to 0, re-hiding the release's default-DMS behavior.
         self.max_mut = tk.Checkbutton(
             self,
             text="Maximize Nucleotide Change (2 or more)",

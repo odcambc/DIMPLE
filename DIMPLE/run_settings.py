@@ -6,9 +6,12 @@ config object and mutates it in place; the populated config is then handed to
 :func:`addgene` to build the oligo :class:`~DIMPLE.pool.Pool`.
 
 Random seed policy:
-    * CLI: ``None`` unless ``-seed`` is passed (nondeterministic RNG per gene
-      when ``None``).
-    * GUI: defaults to ``1848`` for reproducibility unless overridden.
+    Deterministic by default. Every entrypoint (CLI / GUI / web / notebook)
+    resolves an unset seed to :data:`~DIMPLE.pool.DEFAULT_RANDOM_SEED` (1848)
+    via :func:`resolve_random_seed`, so the same gene + settings yield identical
+    oligos everywhere. Pass any integer (including ``0``, which is respected —
+    not coerced to the default) to vary the library. The effective seed is
+    logged once per run in :func:`~DIMPLE.runner.build_runtime_config`.
 """
 
 from __future__ import annotations
@@ -22,11 +25,24 @@ from typing import List, Optional, Union
 
 from Bio.Seq import Seq
 
-from DIMPLE.pool import PRIMER_BUFFER_BASE, DimpleRuntimeConfig
+from DIMPLE.pool import DEFAULT_RANDOM_SEED, PRIMER_BUFFER_BASE, DimpleRuntimeConfig
 from DIMPLE.utilities import codon_usage
 
-# Default GUI random seed (matches historical GUI behavior and tests).
-DEFAULT_GUI_RANDOM_SEED: int = 1848
+
+def resolve_random_seed(raw) -> int:
+    """Resolve a user-supplied seed (str/int/None) to a concrete int.
+
+    Deterministic-by-default: an unset seed (``None``, blank, or ``"none"``)
+    becomes :data:`DEFAULT_RANDOM_SEED`. An explicit ``0`` is respected rather
+    than coerced to the default — fixing the old ``seed if seed else None``
+    footgun where a deliberate seed of 0 silently became nondeterministic.
+    Shared by the CLI and web entrypoints so they stay aligned.
+    """
+    if raw is None:
+        return DEFAULT_RANDOM_SEED
+    if str(raw).strip().lower() in ("", "none"):
+        return DEFAULT_RANDOM_SEED
+    return int(raw)
 
 
 def configure_dimple_logging(log_file: str, level: int = logging.INFO) -> logging.Logger:
@@ -304,6 +320,14 @@ def apply_instance_settings(
         aminoacids: Three-letter amino acid codes to scan (replaces ``gene.aminoacids``).
         doublefrag: ``0`` or ``1`` fragment-per-oligo layout.
         gene_primer_tm: Melting temperature bounds for gene primers.
+
+    Raises:
+        NotImplementedError: if ``doublefrag=1``. The two-fragments-per-oligo
+            layout is undocumented, untested, and has a latent bug in its
+            odd-remainder assembly block (``DIMPLE.py`` ~1307 treats a
+            list-of-lists as flat SeqRecords → ``AttributeError``). Guarded here
+            so it fails with a clear message instead of crashing cryptically
+            mid-run; support is deferred pending an actual use case.
     """
     if gene_primer_tm is not None:
         config.gene_primer_tm = gene_primer_tm
@@ -311,4 +335,10 @@ def apply_instance_settings(
         if aminoacids is not None:
             gene.aminoacids = [a.strip() for a in aminoacids]
         if doublefrag is not None:
+            if int(doublefrag) == 1:
+                raise NotImplementedError(
+                    "doublefrag=1 (two fragments per oligo) is not supported in this "
+                    "release: the layout is untested and has a known assembly bug. "
+                    "Use doublefrag=0 (the default)."
+                )
             gene.doublefrag = int(doublefrag)
