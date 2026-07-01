@@ -119,9 +119,7 @@ def test_gui_run_builds_valid_config(monkeypatch):
     monkeypatch.setattr(gui, "app", _fake_app(), raising=False)
     monkeypatch.setattr(gui, "addgene", _stub_addgene)
     # Avoid a real messagebox (no display) if an unexpected error path fires.
-    monkeypatch.setattr(
-        gui, "messagebox", types.SimpleNamespace(showerror=lambda *a, **k: None)
-    )
+    monkeypatch.setattr(gui, "messagebox", types.SimpleNamespace(showerror=lambda *a, **k: None))
 
     with pytest.raises(_StopBeforePipeline):
         gui.run()
@@ -147,9 +145,7 @@ def test_gui_run_completes_full_pipeline(monkeypatch, tmp_path, kir_fa):
     """
     wdir = str(tmp_path) + "/"
     monkeypatch.setattr(gui, "app", _fake_app(geneFile=str(kir_fa), wDir=wdir), raising=False)
-    monkeypatch.setattr(
-        gui, "messagebox", types.SimpleNamespace(showerror=lambda *a, **k: None)
-    )
+    monkeypatch.setattr(gui, "messagebox", types.SimpleNamespace(showerror=lambda *a, **k: None))
 
     gui.run()  # must run clean through post_qc + print_all
 

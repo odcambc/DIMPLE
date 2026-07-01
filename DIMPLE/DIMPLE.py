@@ -329,9 +329,7 @@ def generate_DMS_fragments(
         # block), so a non-DMS run has nothing to put here; skip creation
         # entirely rather than shipping a zero-byte file.
         if dms:
-            with open(
-                os.path.join(folder.replace("\\", ""), gene.geneid + "_mutations.csv"), "w"
-            ):
+            with open(os.path.join(folder.replace("\\", ""), gene.geneid + "_mutations.csv"), "w"):
                 pass
         # Loop through each fragment
         while idx < len(gene.breaklist):

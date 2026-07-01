@@ -44,8 +44,7 @@ def assert_outputs_consistent(
 
     overlong = [(r.id, len(r.seq)) for r in oligo_records if len(r.seq) > config.synth_len]
     assert not overlong, (
-        f"{len(overlong)} oligos exceed synth_len={config.synth_len}; "
-        f"first few: {overlong[:3]}"
+        f"{len(overlong)} oligos exceed synth_len={config.synth_len}; " f"first few: {overlong[:3]}"
     )
 
     with variants_path.open(newline="") as f:
