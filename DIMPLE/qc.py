@@ -162,7 +162,7 @@ def _pcr_or_friendly_error(fwd, rev, template, gene_id, context):
     """
     try:
         product = pcr(fwd, rev, template)
-    except Exception as exc:  # pydna raises ValueError for non-specific / no product
+    except ValueError as exc:  # pydna raises ValueError for non-specific / no product
         raise ValueError(
             f"Primer specificity check failed for {gene_id} ({context}): a designed "
             f"primer anneals at more than one site, so the fragment cannot be "
