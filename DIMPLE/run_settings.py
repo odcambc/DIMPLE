@@ -25,6 +25,7 @@ from typing import List, Optional, Union
 
 from Bio.Seq import Seq
 
+from DIMPLE.core import MAXFRAG_OFFSET
 from DIMPLE.pool import DEFAULT_RANDOM_SEED, PRIMER_BUFFER_BASE, DimpleRuntimeConfig
 from DIMPLE.utilities import codon_usage
 
@@ -202,7 +203,7 @@ def compute_overlaps_and_maxfrag(
         if logger:
             logger.info("Maximum fragment length: %s based on input", config.maxfrag)
     else:
-        config.maxfrag = oligo_len - 64 - overlap_l - overlap_r
+        config.maxfrag = oligo_len - MAXFRAG_OFFSET - overlap_l - overlap_r
         if logger:
             logger.info(
                 "Maximum fragment length: %s based on oligo length and overlap: 2 * %s",
