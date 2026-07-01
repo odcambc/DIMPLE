@@ -7,6 +7,8 @@ final-assembly verification.
 from __future__ import annotations
 
 import logging
+import re
+from collections import Counter
 
 from Bio.Restriction import BsaI, BsmBI
 from Bio.SeqRecord import SeqRecord
@@ -19,10 +21,45 @@ from DIMPLE.core import DIMPLE
 logger = logging.getLogger(__name__)
 
 
+_DROP_FRACTION_LIMIT = 0.02  # >2% dropped signals a systematic layout problem
+
+
+def report_dropped_oligos(pool):
+    """Summarise oligos dropped for edit-induced internal restriction sites.
+
+    A handful of drops is expected (some variants inherently carry the enzyme
+    site). Make it loud regardless, and hard-fail if more than a small fraction
+    is lost -- a large or fragment-concentrated drop means a systematic problem
+    (e.g. a whole subpool whose overhang reconstitutes the site) rather than a few
+    unavoidable variants, and must not slip through as a routine warning.
+    """
+    dropped = [(g.geneid, vid) for g in pool for vid in getattr(g, "dropped_oligos", [])]
+    if not dropped:
+        return
+    total = sum(len(g.designed_variants) + len(getattr(g, "dropped_oligos", [])) for g in pool)
+    by_subpool = Counter(re.search(r"-(\d+)_", vid).group(1) for _, vid in dropped if re.search(r"-(\d+)_", vid))
+    msg = (
+        f"Dropped {len(dropped)} of {total} oligos with an internal restriction site "
+        f"(cannot assemble). By subpool: {dict(sorted(by_subpool.items()))}. "
+        f"Examples: {[vid for _, vid in dropped[:8]]}"
+    )
+    logger.warning("=" * 78)
+    logger.warning(msg)
+    logger.warning("=" * 78)
+    if total and len(dropped) / total > _DROP_FRACTION_LIMIT:
+        raise Exception(
+            f"Too many oligos dropped for internal restriction sites: {len(dropped)}/{total} "
+            f"(> {_DROP_FRACTION_LIMIT:.0%}). This indicates a systematic layout problem "
+            f"(likely a subpool overhang reconstituting {pool.config.cutsite}), not a few "
+            f"unavoidable variants. By subpool: {dict(sorted(by_subpool.items()))}."
+        )
+
+
 def post_qc(pool):
     logger.info("Running post QC")
     if not isinstance(pool[0], DIMPLE):
         raise TypeError("Not an instance of the DIMPLE class")
+    report_dropped_oligos(pool)
     # Post QC
     all_oligos = []
     all_barPrimers = []

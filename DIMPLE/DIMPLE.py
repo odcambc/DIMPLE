@@ -337,6 +337,7 @@ def generate_DMS_fragments(
                 gene.oligos = []
                 gene.barPrimer = []
                 gene.genePrimer = []
+                gene.dropped_oligos = []
             frag = gene.breaklist[idx]
             grouped_oligos = []
             # AA range for fragment (need to subtract beginning primer buffer)
@@ -1220,6 +1221,26 @@ def generate_DMS_fragments(
                                 < 2
                             ):
                                 raise Exception("Oligo does not have 2 cutsites")
+                            # Drop oligos whose coding carries an edit-induced internal
+                            # Type IIS site (the enzyme would cut the insert and it
+                            # can't assemble). Boundary/overhang cases are prevented in
+                            # check_overhangs; these residual ones are inherent to the
+                            # variant's sequence (fixed insert/delete handle, or no
+                            # synonymous codon avoids the site) and cannot be salvaged.
+                            coding_core = sequence.seq[
+                                pool.config.cutsite_overhang : -pool.config.cutsite_overhang
+                            ]
+                            if _internal_cutsite(
+                                combined_sequence, coding_core, pool.config.cutsite
+                            ):
+                                logger.error(
+                                    f"Dropping {sequence.id}: a {pool.config.cutsite} site falls "
+                                    "inside the coding region (edit-induced spurious restriction "
+                                    "site); the oligo would be cut internally and cannot assemble."
+                                )
+                                gene.dropped_oligos.append(sequence.id)
+                                gene.designed_variants.pop(sequence.id, None)
+                                continue
                             if len(combined_sequence) > pool.config.synth_len:
                                 raise Exception(
                                     f"Oligo too long: {str(len(combined_sequence))} is longer "
@@ -1424,6 +1445,7 @@ def generate_DMS_fragments(
 
 
 from DIMPLE.fragment_layout import (  # noqa: E402
+    _internal_cutsite,
     check_overhangs,
     recalculate_num_fragments,
     switch_fragmentsize,
