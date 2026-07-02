@@ -133,6 +133,9 @@ def build_runtime_config(
     )
 
     apply_random_seed(random_seed, config=config)
+    # Record the effective seed on every run so a design is reproducible after
+    # the fact (the per-gene RNG in core.py draws from config.random_seed).
+    (logger or _logger).info("Effective random seed: %s", config.random_seed)
     resolve_codon_usage(codon_usage, config=config)
 
     return config, overlap_l, overlap_r

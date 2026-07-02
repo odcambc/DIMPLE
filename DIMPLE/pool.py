@@ -29,6 +29,13 @@ logger = logging.getLogger(__name__)
 # raises it to PRIMER_BUFFER_BASE + overlap.
 PRIMER_BUFFER_BASE: int = 30
 
+# Canonical default seed for the per-gene NumPy RNG (drives synonymous-codon
+# choice). Deterministic-by-default so the same gene + settings yield identical
+# oligos across all four entrypoints (CLI / GUI / web / notebook); callers pass
+# their own seed to vary a library. Defined here (the base module) so both the
+# dataclass default below and run_settings share one source of truth.
+DEFAULT_RANDOM_SEED: int = 1848
+
 # Bundled barcode primer sets, loaded once. Each DimpleRuntimeConfig gets its
 # own copy because barcodes are consumed (popped) as a run assigns subpools.
 _DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
@@ -55,7 +62,7 @@ class DimpleRuntimeConfig:
     synth_len: Optional[int] = None
     maxfrag: Optional[int] = None
     primer_buffer: int = PRIMER_BUFFER_BASE
-    random_seed: Optional[int] = 0
+    random_seed: Optional[int] = DEFAULT_RANDOM_SEED
     avoid_sequence: Optional[List[Seq]] = None
     barcode_f: list = field(default_factory=lambda: list(_BARCODES_F))
     barcode_r: list = field(default_factory=lambda: list(_BARCODES_R))

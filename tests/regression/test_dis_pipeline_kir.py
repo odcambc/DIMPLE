@@ -25,7 +25,7 @@ from ._helpers import assert_outputs_consistent
 
 # Default domain-insertion handle from run_dimple.py (BsaI-based, 24 nt).
 _HANDLE = "AGCGGGAGACCGGGGTCTCTGAGC"
-_OVERLAP = 3
+_OVERLAP = 4
 
 
 @pytest.mark.slow
@@ -39,8 +39,8 @@ def test_dis_pipeline_kir(tmp_path, dimple_human_usage, kir_fa):
     config = DimpleRuntimeConfig(
         handle=_HANDLE,
         synth_len=230,
-        maxfrag=230 - 62 - _OVERLAP,
-        primer_buffer=30 + _OVERLAP,
+        maxfrag=230 - 64 - _OVERLAP - _OVERLAP,  # synth_len - 64 - overlap_l - overlap_r
+        primer_buffer=30 + _OVERLAP,  # PRIMER_BUFFER_BASE + overlap = 34
         dms=False,
         stop_codon=True,
         make_double=False,

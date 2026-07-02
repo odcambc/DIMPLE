@@ -39,7 +39,7 @@ _GOLDEN_FILES = [
     "All_Primers.fasta",
 ]
 
-_OVERLAP = 3
+_OVERLAP = 4
 
 
 @pytest.mark.slow
@@ -54,8 +54,8 @@ def test_dms_pipeline_kir(tmp_path, dimple_human_usage, kir_fa, update_golden):
     config = DimpleRuntimeConfig(
         handle="",
         synth_len=230,
-        maxfrag=230 - 62 - _OVERLAP,  # 165
-        primer_buffer=30 + _OVERLAP,  # PRIMER_BUFFER_BASE + overlap = 33
+        maxfrag=230 - 64 - _OVERLAP - _OVERLAP,  # synth_len - 64 - overlap_l - overlap_r
+        primer_buffer=30 + _OVERLAP,  # PRIMER_BUFFER_BASE + overlap = 34
         dms=True,
         stop_codon=True,
         make_double=False,

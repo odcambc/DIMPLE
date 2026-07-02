@@ -1,14 +1,17 @@
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+# DIMPLE is an application you download and run, not a library you install.
+# `package = false` tells uv to sync the dependencies below into .venv without
+# building/installing DIMPLE itself as a wheel — the code runs in place from the
+# repo root. There is intentionally no [build-system] table.
+[tool.uv]
+package = false
 
 [project]
 name = "dimple"
-version = "0.1.0"
+version = "1.1.0"
 description = "Deep Indel Missense Programmable Library Engineering"
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "biopython==1.84",
     "numpy==1.26.4",
@@ -24,9 +27,9 @@ dev = [
     "mypy",
     "ruff",
 ]
-
-[tool.hatch.build.targets.wheel]
-packages = ["DIMPLE"]
+web = [
+    "gradio>=4.0",
+]
 
 [tool.pytest.ini_options]
 minversion = "8.0"

@@ -170,9 +170,18 @@ def align_genevariation(pool):
             for x in fragsize:
                 total += x
                 breaksites.extend([total])
+            # Snap-target grid must sit in the same reading frame the breaksites
+            # setter enforces: (site - primer_buffer) % 3 == 0. Start the grid at
+            # primer_buffer % 3 (not 0) so it stays frame-aligned when
+            # primer_buffer isn't itself a multiple of 3 (e.g. overlap=4 →
+            # primer_buffer=34). At overlap=3 (primer_buffer=33) this is a no-op.
             available_sites = [
                 xsite
-                for xsite in range(0, max_gene_len + pool.config.primer_buffer + 1, 3)
+                for xsite in range(
+                    pool.config.primer_buffer % 3,
+                    max_gene_len + pool.config.primer_buffer + 1,
+                    3,
+                )
                 if xsite not in problemsites
             ]
             breaksites = [
@@ -312,12 +321,23 @@ def generate_DMS_fragments(
         # missingTable = [[1]*gene.aacount]*gene.aacount
         missingFragments = []
         all_grouped_oligos = []
+        # Start the per-gene mutations CSV fresh, but only for DMS runs: the
+        # per-fragment writes below are DMS-gated and append to it, so truncate
+        # once here (a re-run otherwise duplicates every row). The mutations
+        # file is a DMS-substitutions-only artifact (insertions/deletions go to
+        # designed_variants.csv, and synonymous exist only within the DMS
+        # block), so a non-DMS run has nothing to put here; skip creation
+        # entirely rather than shipping a zero-byte file.
+        if dms:
+            with open(os.path.join(folder.replace("\\", ""), gene.geneid + "_mutations.csv"), "w"):
+                pass
         # Loop through each fragment
         while idx < len(gene.breaklist):
             if idx == 0:
                 gene.oligos = []
                 gene.barPrimer = []
                 gene.genePrimer = []
+                gene.dropped_oligos = []
             frag = gene.breaklist[idx]
             grouped_oligos = []
             # AA range for fragment (need to subtract beginning primer buffer)
@@ -727,9 +747,7 @@ def generate_DMS_fragments(
                                         + mutations[combi[1]]
                                         + tmpseq[pos2 + 3 :]
                                     )
-                                    double_name = (
-                                        combi[0].strip(">") + "+" + combi[1].strip(">")
-                                    )
+                                    double_name = combi[0].strip(">") + "+" + combi[1].strip(">")
                                     double_oligo_id = (
                                         gene.geneid + "_DMS-" + str(idx + 1) + "_" + double_name
                                     )
@@ -767,8 +785,8 @@ def generate_DMS_fragments(
                                         "fragment": idx + 1,
                                         "xfrag": xfrag,
                                     }
-                    # record mutation for analysis with NGS
-                    # TODO: Don't append.
+                    # record mutation for analysis with NGS (file truncated
+                    # once per gene above, so appending per fragment is correct)
                     with open(
                         os.path.join(folder.replace("\\", ""), gene.geneid + "_mutations.csv"),
                         "a",
@@ -854,8 +872,11 @@ def generate_DMS_fragments(
                             name = (
                                 f"{seq1(wt_pre_aa)}{pos}_{seq1(wt_post_aa)}{pos+1}_ins{insert_name}"
                             )
-                            # TODO: Insert length assumes that the insert is a multiple of 3
-                            # (i.e. codon insertions). Make more flexible.
+                            # Note: insert length is assumed to be a multiple of 3
+                            # (codon insertions) -- the `len(insert_n) // 3` below
+                            # counts inserted codons. Non-codon insertions are not
+                            # supported; the CLI/README document the multiple-of-3
+                            # requirement for insertions.
                             gene.designed_variants[oligo_id] = {
                                 "count": 0,
                                 "pos": pos,
@@ -872,10 +893,6 @@ def generate_DMS_fragments(
                 ### Scanning Deletions
                 if delete:
                     # deletion
-                    # TODO: failing here, for some reason. i becomes too large.
-                    # fragment lengths are too high? no.
-                    # overlaps are too small for larger deletion sizes. why?
-
                     # Iterate over codon boundaries in the fragment
                     # Shifted down by 3 to avoid long deletions running into the primer
                     # binding region
@@ -896,12 +913,20 @@ def generate_DMS_fragments(
                         ]
 
                         for delete_n in delete:
-                            # Check if deletion extends beyond ORF.
-                            if pos + delete_n > len(gene.seq) / 3:
+                            # Check if deletion extends beyond ORF. pos is an AA
+                            # index while delete_n is a nucleotide count, so
+                            # convert delete_n to codons and compare against the
+                            # clean ORF codon count. The old check used
+                            # len(gene.seq) / 3, which is primer-buffer-inflated
+                            # (gene.seq spans the ORF ± primer_buffer), so the
+                            # guard never fired. This is advisory only: the
+                            # variant is still emitted (a caller may intend a
+                            # C-terminal truncation), but the warning now
+                            # actually surfaces.
+                            if pos + delete_n // 3 > gene.aacount:
                                 logger.warning(
                                     "Deletion extends beyond ORF: " + f"D{pos}_{delete_n}"
                                 )
-                                pass
                             # Check if deletion extends beyond the fragment.
                             if delete_n + i > len(tmpseq):
                                 print("overlap: ", overlapL)
@@ -1196,6 +1221,26 @@ def generate_DMS_fragments(
                                 < 2
                             ):
                                 raise Exception("Oligo does not have 2 cutsites")
+                            # Drop oligos whose coding carries an edit-induced internal
+                            # Type IIS site (the enzyme would cut the insert and it
+                            # can't assemble). Boundary/overhang cases are prevented in
+                            # check_overhangs; these residual ones are inherent to the
+                            # variant's sequence (fixed insert/delete handle, or no
+                            # synonymous codon avoids the site) and cannot be salvaged.
+                            coding_core = sequence.seq[
+                                pool.config.cutsite_overhang : -pool.config.cutsite_overhang
+                            ]
+                            if _internal_cutsite(
+                                combined_sequence, coding_core, pool.config.cutsite
+                            ):
+                                logger.error(
+                                    f"Dropping {sequence.id}: a {pool.config.cutsite} site falls "
+                                    "inside the coding region (edit-induced spurious restriction "
+                                    "site); the oligo would be cut internally and cannot assemble."
+                                )
+                                gene.dropped_oligos.append(sequence.id)
+                                gene.designed_variants.pop(sequence.id, None)
+                                continue
                             if len(combined_sequence) > pool.config.synth_len:
                                 raise Exception(
                                     f"Oligo too long: {str(len(combined_sequence))} is longer "
@@ -1400,6 +1445,7 @@ def generate_DMS_fragments(
 
 
 from DIMPLE.fragment_layout import (  # noqa: E402
+    _internal_cutsite,
     check_overhangs,
     recalculate_num_fragments,
     switch_fragmentsize,

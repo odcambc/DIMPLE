@@ -48,6 +48,19 @@ class TestQCPaths(unittest.TestCase):
         result = check_final_assembly(self.gene)
         self.assertIsNone(result)
 
+    def test_pcr_wrapper_reraises_nonspecific_with_guidance(self) -> None:
+        # A raw pydna "PCR not specific" failure is re-raised as an actionable
+        # DIMPLE message naming the gene and pointing at oligo length / Tm.
+        from DIMPLE.qc import _pcr_or_friendly_error
+
+        with patch("DIMPLE.qc.pcr", side_effect=ValueError("PCR not specific! ...")):
+            with self.assertRaises(ValueError) as ctx:
+                _pcr_or_friendly_error("f", "r", "t", "Shaker", "gene primer, fragment 3")
+        msg = str(ctx.exception)
+        self.assertIn("Shaker", msg)
+        self.assertIn("longer oligo", msg)
+        self.assertIn("pydna:", msg)
+
 
 if __name__ == "__main__":
     unittest.main()

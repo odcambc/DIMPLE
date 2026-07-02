@@ -182,6 +182,66 @@ def switch_fragmentsize(gene, detectedsite, pool):
     return skip
 
 
+def _overlapping_count(haystack, needle) -> int:
+    """Count occurrences of ``needle`` in ``haystack`` allowing overlaps.
+
+    ``str.count`` is non-overlapping and therefore undercounts sites that overlap
+    (e.g. ``"CGTCTCGTCTC".count("CGTCTC") == 1`` even though a Type IIS enzyme cuts
+    at both position 0 and position 5).
+    """
+    hay = str(haystack).upper()
+    sub = str(needle).upper()
+    if not sub:
+        return 0
+    return sum(1 for i in range(len(hay) - len(sub) + 1) if hay[i : i + len(sub)] == sub)
+
+
+def _overhang_recreates_cutsite(cutsite, cutsite_buffer, overhang) -> bool:
+    """True if an overhang reconstitutes the enzyme recognition site.
+
+    The oligo lays down the synthetic 5'->3' junction ``cutsite + buffer + overhang``.
+    If the overhang (or its reverse complement) makes that junction contain the
+    recognition site anywhere beyond the single intended copy at its 5' end -- on
+    either strand -- the enzyme gains a spurious internal cut site and the fragment
+    assembles with the wrong overhang (or not at all). Example: overhang ``TCTC``
+    with BsmBI ``CGTCTC`` + ``G`` buffer -> ``CGTCTCGTCTC``, which contains ``CGTCTC``
+    twice. The coding-side ``avoid_sequence`` screen never sees this because the
+    spurious site spans the scaffold/overhang boundary, not the coding alone.
+    """
+    cs = str(cutsite).upper()
+    csr = str(cutsite.reverse_complement()).upper()
+    for oh in (overhang, overhang.reverse_complement()):
+        junction = cs + str(cutsite_buffer).upper() + str(oh).upper()
+        if _overlapping_count(junction, cs) > 1 or _overlapping_count(junction, csr) > 0:
+            return True
+    return False
+
+
+def _internal_cutsite(oligo_seq, coding_core, cutsite) -> bool:
+    """True if a Type IIS recognition site falls INSIDE the oligo's coding region.
+
+    A well-formed oligo has its two designed sites flanking the coding; a site
+    *inside* the coding span means the enzyme cuts the insert internally, so the
+    fragment cannot assemble. A spurious site elsewhere (in a barcode arm) is
+    benign -- it only trims a discarded piece. This distinguishes genuinely broken
+    oligos from benign extra sites without a full assembly simulation.
+
+    ``coding_core`` is the coding embedded in the oligo (mutation carrier, without
+    the flanking overhangs), used only to locate the coding span in ``oligo_seq``.
+    """
+    oseq = str(oligo_seq).upper()
+    core = str(coding_core).upper()
+    start = oseq.find(core)
+    if start < 0 or not core:
+        return False
+    end = start + len(core)
+    for site in (str(cutsite).upper(), str(cutsite.reverse_complement()).upper()):
+        j = oseq.find(site, start)
+        if 0 <= j < end:
+            return True
+    return False
+
+
 def check_overhangs(gene, pool, overlap_l, overlap_r):
     """TODO:
     Docstring
@@ -190,6 +250,7 @@ def check_overhangs(gene, pool, overlap_l, overlap_r):
     switched = False
     if not isinstance(gene, DIMPLE):
         raise TypeError("Not an instance of the DIMPLE class")
+    cfg = gene.pool.config
     while True:
         detectedsites = set()  # stores matching overhangs
         for idx, y in enumerate(gene.breaklist):
@@ -200,6 +261,17 @@ def check_overhangs(gene, pool, overlap_l, overlap_r):
                 y[1] + overlap_l : y[1] + gene.pool.config.cutsite_overhang + overlap_r
             ]  # Reverse overhang
             if overhang_F == overhang_R or overhang_F == overhang_R.reverse_complement():
+                detectedsites.update([idx])
+            # Reject overhangs that reconstitute the Type IIS site through the
+            # cutsite buffer (creates a spurious internal cut -> dead fragment).
+            if (
+                cfg.cutsite is not None
+                and cfg.cutsite_buffer is not None
+                and (
+                    _overhang_recreates_cutsite(cfg.cutsite, cfg.cutsite_buffer, overhang_F)
+                    or _overhang_recreates_cutsite(cfg.cutsite, cfg.cutsite_buffer, overhang_R)
+                )
+            ):
                 detectedsites.update([idx])
         for detectedsite in detectedsites:
             switched = True

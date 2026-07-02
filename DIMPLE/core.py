@@ -19,12 +19,19 @@ from DIMPLE.utilities import findORF
 
 logger = logging.getLogger(__name__)
 
+# nt reserved per oligo for barcodes, cut sites, and handle -- subtracted (with
+# the two overlaps) from the synthesized oligo length to get the usable fragment
+# length. Lives here (the base module) so run_settings can import it upward
+# rather than re-hardcoding the literal; pool.py imports from core, so core
+# can't import the constant back from pool.
+MAXFRAG_OFFSET = 64
+
 
 class DIMPLE:
     """A single gene of a DIMPLE oligo pool."""
 
     # Fixed constants (not run configuration -- never change per run).
-    maxfrag_offset = 64  # nt reserved for barcodes, cut sites, and handle
+    maxfrag_offset = MAXFRAG_OFFSET
     minfrag = 24  # smallest size for golden gate fragment efficiency
     primerTm = (56.5, 60)  # melting temperature limits for fragment primers
 

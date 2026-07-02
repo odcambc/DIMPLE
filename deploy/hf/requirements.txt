@@ -1,0 +1,18 @@
+# DIMPLE web-app dependencies for the HuggingFace Spaces builder.
+#
+# This file is pip-installed by HF at build time; uv.lock is NOT used on the
+# Space, so these are the only pins that reach it. The three core deps mirror
+# [project.dependencies] in ../../pyproject.toml -- keep them in sync by hand
+# (there is no flat requirements.txt in the repo root to derive from). To see
+# the versions uv currently resolves for cross-checking:
+#
+#     uv export --no-emit-project --no-hashes | grep -iE '^(biopython|numpy|pydna)=='
+#
+# gradio is intentionally a floor, not pinned to the lock: the Space README
+# floats sdk_version so HF supplies a Gradio new enough for delete_cache /
+# max_file_size. Pin it here (and match README sdk_version) only if you want a
+# fully reproducible Space build.
+biopython==1.84
+numpy==1.26.4
+pydna==5.4.0
+gradio>=4.0
