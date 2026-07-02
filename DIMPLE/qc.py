@@ -37,7 +37,9 @@ def report_dropped_oligos(pool):
     if not dropped:
         return
     total = sum(len(g.designed_variants) + len(getattr(g, "dropped_oligos", [])) for g in pool)
-    by_subpool = Counter(re.search(r"-(\d+)_", vid).group(1) for _, vid in dropped if re.search(r"-(\d+)_", vid))
+    by_subpool = Counter(
+        re.search(r"-(\d+)_", vid).group(1) for _, vid in dropped if re.search(r"-(\d+)_", vid)
+    )
     msg = (
         f"Dropped {len(dropped)} of {total} oligos with an internal restriction site "
         f"(cannot assemble). By subpool: {dict(sorted(by_subpool.items()))}. "

@@ -85,9 +85,9 @@ def test_kir_oligos_assemble(tmp_path, dimple_human_usage, kir_fa, caplog):
         for r in caplog.records
         if "does not assemble with template" in r.getMessage()
     ]
-    assert not unassemblable, (
-        f"{len(unassemblable)} shipped oligos fail to assemble: {unassemblable[:10]}"
-    )
+    assert (
+        not unassemblable
+    ), f"{len(unassemblable)} shipped oligos fail to assemble: {unassemblable[:10]}"
 
     # post_qc must not hard-fail on this handful of drops (stays under the fraction
     # limit) and its report exercises the drop-summary path.
