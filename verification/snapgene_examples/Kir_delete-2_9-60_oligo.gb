@@ -1,0 +1,31 @@
+LOCUS       delete-2_9-60            230 bp    ds-DNA  linear   UNK 01-JAN-1980
+DEFINITION  Kir_delete-2_9-60 designed oligo.
+ACCESSION   delete-2_9-60
+VERSION     delete-2_9-60
+KEYWORDS    .
+SOURCE      .
+  ORGANISM  .
+            .
+FEATURES             Location/Qualifiers
+     misc_feature    1..31
+                     /label="barcode primer F"
+     protein_bind    32..37
+                     /label="BsmBI"
+     protein_bind    194..199
+                     /label="BsmBI"
+     misc_feature    200..230
+                     /label="barcode primer R"
+     misc_feature    39..42
+                     /label="5' overhang"
+     misc_feature    189..192
+                     /label="3' overhang"
+     CDS             39..192
+                     /label="insert (9-60)"
+     modified_base   77
+                     /label="9-60"
+ORIGIN
+        1 atgaatgctc cgtactgagg cgcctgacgt ccgtctcgtt gtcaagaaag atggccactg
+       61 taatgtgcag ttcatagaaa agggtcaacg gtacttggcc gatattttca caacctgcgt
+      121 tgatatccgc tggcgctgga tgttggttat tttttgtctc gccttcgtac tgtcttggct
+      181 cttctttggc tgcgagacgg acgcctggaa ctgtagtcgc tagtgagcgc
+//

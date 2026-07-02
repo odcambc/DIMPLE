@@ -1,0 +1,31 @@
+LOCUS       insert-2_GAC-60          230 bp    ds-DNA  linear   UNK 01-JAN-1980
+DEFINITION  Kir_insert-2_GAC-60 designed oligo.
+ACCESSION   insert-2_GAC-60
+VERSION     insert-2_GAC-60
+KEYWORDS    .
+SOURCE      .
+  ORGANISM  .
+            .
+FEATURES             Location/Qualifiers
+     misc_feature    1..25
+                     /label="barcode primer F"
+     protein_bind    26..31
+                     /label="BsmBI"
+     protein_bind    200..205
+                     /label="BsmBI"
+     misc_feature    206..230
+                     /label="barcode primer R"
+     misc_feature    33..36
+                     /label="5' overhang"
+     misc_feature    195..198
+                     /label="3' overhang"
+     CDS             33..198
+                     /label="insert (GAC-60)"
+     modified_base   75..77
+                     /label="GAC-60"
+ORIGIN
+        1 atgaatgctc cgtactgagg cgcctcgtct cgttgtcaag aaagatggcc actgtaatgt
+       61 gcagttcata aacgacgtgg gggaaaaggg tcaacggtac ttggccgata ttttcacaac
+      121 ctgcgttgat atccgctggc gctggatgtt ggttattttt tgtctcgcct tcgtactgtc
+      181 ttggctcttc tttggctgcg agacgtggaa ctgtagtcgc tagtgagcgc
+//

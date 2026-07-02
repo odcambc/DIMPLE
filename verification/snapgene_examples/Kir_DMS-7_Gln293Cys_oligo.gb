@@ -1,0 +1,31 @@
+LOCUS       DMS-7_Gln293Cys          230 bp    ds-DNA  linear   UNK 01-JAN-1980
+DEFINITION  Kir_DMS-7_Gln293Cys designed oligo.
+ACCESSION   DMS-7_Gln293Cys
+VERSION     DMS-7_Gln293Cys
+KEYWORDS    .
+SOURCE      .
+  ORGANISM  .
+            .
+FEATURES             Location/Qualifiers
+     misc_feature    1..26
+                     /label="barcode primer F"
+     protein_bind    27..32
+                     /label="BsmBI"
+     protein_bind    198..203
+                     /label="BsmBI"
+     misc_feature    204..230
+                     /label="barcode primer R"
+     misc_feature    34..37
+                     /label="5' overhang"
+     misc_feature    193..196
+                     /label="3' overhang"
+     CDS             34..196
+                     /label="insert (Gln293Cys)"
+     modified_base   45..47
+                     /label="Gln293Cys"
+ORIGIN
+        1 ccggtggtgg aaatgagtag ccagtccgtc tcgacctctc caaatgtgac atcgacaacg
+       61 ctgatttcga aattgtcgtt atactggaag ggatggtaga ggccaccgct atgacaaccc
+      121 aatgtcgaag tagttatctt gccaatgaaa tcctttgggg ccatcgctac gaacctgtct
+      181 tgtttgagga gaagcacgag acgaatatag ggtggtcggg gtatacatcg
+//

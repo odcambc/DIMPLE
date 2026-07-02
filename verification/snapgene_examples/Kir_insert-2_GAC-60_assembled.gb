@@ -1,0 +1,74 @@
+LOCUS       insert-2_GAC-60_        1376 bp    ds-DNA  circular UNK 01-JAN-1980
+DEFINITION  Kir_insert-2_GAC-60 assembled into template.
+ACCESSION   insert-2_GAC-60_
+VERSION     insert-2_GAC-60_
+KEYWORDS    .
+SOURCE      .
+  ORGANISM  .
+            .
+FEATURES             Location/Qualifiers
+     misc_feature    171..336
+                     /label="Fragment 2 (assembled)"
+     modified_base   213..215
+                     /label="GAC-60"
+     primer_bind     complement(12..26)
+                     /label="Kir_geneP_Mut-1_R"
+     primer_bind     194..211
+                     /label="Kir_geneP_Mut-1_F"
+     primer_bind     complement(155..170)
+                     /label="Kir_geneP_Mut-2_R"
+     primer_bind     338..355
+                     /label="Kir_geneP_Mut-2_F"
+     primer_bind     complement(304..320)
+                     /label="Kir_geneP_Mut-3_R"
+     primer_bind     484..501
+                     /label="Kir_geneP_Mut-3_F"
+     primer_bind     complement(446..463)
+                     /label="Kir_geneP_Mut-4_R"
+     primer_bind     638..655
+                     /label="Kir_geneP_Mut-4_F"
+     primer_bind     complement(592..609)
+                     /label="Kir_geneP_Mut-5_R"
+     primer_bind     781..798
+                     /label="Kir_geneP_Mut-5_F"
+     primer_bind     complement(740..757)
+                     /label="Kir_geneP_Mut-6_R"
+     primer_bind     921..938
+                     /label="Kir_geneP_Mut-6_F"
+     primer_bind     complement(875..892)
+                     /label="Kir_geneP_Mut-7_R"
+     primer_bind     1070..1087
+                     /label="Kir_geneP_Mut-7_F"
+     primer_bind     complement(1028..1045)
+                     /label="Kir_geneP_Mut-8_R"
+     primer_bind     1214..1231
+                     /label="Kir_geneP_Mut-8_F"
+     primer_bind     complement(1168..1185)
+                     /label="Kir_geneP_Mut-9_R"
+     primer_bind     1358..1375
+                     /label="Kir_geneP_Mut-9_F"
+ORIGIN
+        1 ctggtttagt gaaccgtcag atccggccac catgggatca gtgcgaacca atcggtattc
+       61 tatcgtatca agcgaggagg acgggatgaa actggcaacc atggctgtag ccaacggttt
+      121 tgggaatggg aaatctaagg tgcatacccg ccaacagtgc cggtcacgct ttgtcaagaa
+      181 agatggccac tgtaatgtgc agttcataaa cgacgtgggg gaaaagggtc aacggtactt
+      241 ggccgatatt ttcacaacct gcgttgatat ccgctggcgc tggatgttgg ttattttttg
+      301 tctcgccttc gtactgtctt ggctcttctt tggctgcgtt ttttggttga tcgctttgtt
+      361 gcatggagat ttggacaccg attataaaga tgatgatgat aaatccaagg tatccaaggc
+      421 ctgtgtctcc gaagtaaatt cctttaccgc agctttcctt ttctctatcg aaacacaaac
+      481 cactatcgga tacgggttcc gatgcgtcac agacgaatgc ccaatagccg ttttcatggt
+      541 tgtctttcaa tcaatagtgg gctgtattat cgatgcattt atcattgggg ccgtgatggc
+      601 aaaaatggct aagcccaaaa aaagaaatga gacattggtt ttcagtcaca acgctgtgat
+      661 tgccatgagg gatggcaagc tgtgcctcat gtggagggtg ggcaatctga gaaagtccca
+      721 cctcgtagag gcccatgtac gagcacaact gctgaaatca cgcataactt cagaaggaga
+      781 gtacatacca ctcgatcaga ttgatatcaa tgtgggcttc gatagcggca ttgacaggat
+      841 ctttctcgtt agcccaatca ccatcgtcca cgagattgat gaggattctc ctctttatga
+      901 cctctccaaa caagacatcg acaacgctga tttcgaaatt gtcgttatac tggaagggat
+      961 ggtagaggcc accgctatga caacccaatg tcgaagtagt tatcttgcca atgaaatcct
+     1021 ttggggccat cgctacgaac ctgtcttgtt tgaggagaag cactattata aggtcgacta
+     1081 ctctaggttc cacaaaacat acgaagttcc taacacacca ttgtgtagtg ctcgggacct
+     1141 tgcagagaag aagtacattc tgtctaacgc aaactctttc tgttacgaga acgaagtagc
+     1201 tctcacatca aaggaagaag aagaagattc agagaacgga gttcccgagt caaccagcac
+     1261 cgactctcct cccggcattg acctgcacaa ccaagccagt gtccccctgg agcctagacc
+     1321 tcttcggaga gagagtgaaa tctaaaactt gtttattgca gcttataatg gttaca
+//

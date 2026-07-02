@@ -1,0 +1,90 @@
+LOCUS       Kir_template            1373 bp    ds-DNA  linear   UNK 01-JAN-1980
+DEFINITION  Kir gene template: fragments + gene primers.
+ACCESSION   Kir_template
+VERSION     Kir_template
+KEYWORDS    .
+SOURCE      .
+  ORGANISM  .
+            .
+FEATURES             Location/Qualifiers
+     CDS             35..1339
+                     /label="ORF (mutable region)"
+     misc_feature    35..178
+                     /label="Fragment 1"
+     misc_feature    179..325
+                     /label="Fragment 2"
+     misc_feature    326..472
+                     /label="Fragment 3"
+     misc_feature    473..619
+                     /label="Fragment 4"
+     misc_feature    620..763
+                     /label="Fragment 5"
+     misc_feature    764..904
+                     /label="Fragment 6"
+     misc_feature    905..1051
+                     /label="Fragment 7"
+     misc_feature    1052..1195
+                     /label="Fragment 8"
+     misc_feature    1196..1339
+                     /label="Fragment 9"
+     primer_bind     complement(12..26)
+                     /label="Kir_geneP_Mut-1_R"
+     primer_bind     194..211
+                     /label="Kir_geneP_Mut-1_F"
+     primer_bind     complement(155..170)
+                     /label="Kir_geneP_Mut-2_R"
+     primer_bind     335..352
+                     /label="Kir_geneP_Mut-2_F"
+     primer_bind     complement(301..317)
+                     /label="Kir_geneP_Mut-3_R"
+     primer_bind     481..498
+                     /label="Kir_geneP_Mut-3_F"
+     primer_bind     complement(443..460)
+                     /label="Kir_geneP_Mut-4_R"
+     primer_bind     635..652
+                     /label="Kir_geneP_Mut-4_F"
+     primer_bind     complement(589..606)
+                     /label="Kir_geneP_Mut-5_R"
+     primer_bind     778..795
+                     /label="Kir_geneP_Mut-5_F"
+     primer_bind     complement(737..754)
+                     /label="Kir_geneP_Mut-6_R"
+     primer_bind     918..935
+                     /label="Kir_geneP_Mut-6_F"
+     primer_bind     complement(872..889)
+                     /label="Kir_geneP_Mut-7_R"
+     primer_bind     1067..1084
+                     /label="Kir_geneP_Mut-7_F"
+     primer_bind     complement(1025..1042)
+                     /label="Kir_geneP_Mut-8_R"
+     primer_bind     1211..1228
+                     /label="Kir_geneP_Mut-8_F"
+     primer_bind     complement(1165..1182)
+                     /label="Kir_geneP_Mut-9_R"
+     primer_bind     1355..1372
+                     /label="Kir_geneP_Mut-9_F"
+ORIGIN
+        1 ctggtttagt gaaccgtcag atccggccac catgggatca gtgcgaacca atcggtattc
+       61 tatcgtatca agcgaggagg acgggatgaa actggcaacc atggctgtag ccaacggttt
+      121 tgggaatggg aaatctaagg tgcatacccg ccaacagtgc cggtcacgct ttgtcaagaa
+      181 agatggccac tgtaatgtgc agttcataaa cgtgggggaa aagggtcaac ggtacttggc
+      241 cgatattttc acaacctgcg ttgatatccg ctggcgctgg atgttggtta ttttttgtct
+      301 cgccttcgta ctgtcttggc tcttctttgg ctgcgttttt tggttgatcg ctttgttgca
+      361 tggagatttg gacaccgatt ataaagatga tgatgataaa tccaaggtat ccaaggcctg
+      421 tgtctccgaa gtaaattcct ttaccgcagc tttccttttc tctatcgaaa cacaaaccac
+      481 tatcggatac gggttccgat gcgtcacaga cgaatgccca atagccgttt tcatggttgt
+      541 ctttcaatca atagtgggct gtattatcga tgcatttatc attggggccg tgatggcaaa
+      601 aatggctaag cccaaaaaaa gaaatgagac attggttttc agtcacaacg ctgtgattgc
+      661 catgagggat ggcaagctgt gcctcatgtg gagggtgggc aatctgagaa agtcccacct
+      721 cgtagaggcc catgtacgag cacaactgct gaaatcacgc ataacttcag aaggagagta
+      781 cataccactc gatcagattg atatcaatgt gggcttcgat agcggcattg acaggatctt
+      841 tctcgttagc ccaatcacca tcgtccacga gattgatgag gattctcctc tttatgacct
+      901 ctccaaacaa gacatcgaca acgctgattt cgaaattgtc gttatactgg aagggatggt
+      961 agaggccacc gctatgacaa cccaatgtcg aagtagttat cttgccaatg aaatcctttg
+     1021 gggccatcgc tacgaacctg tcttgtttga ggagaagcac tattataagg tcgactactc
+     1081 taggttccac aaaacatacg aagttcctaa cacaccattg tgtagtgctc gggaccttgc
+     1141 agagaagaag tacattctgt ctaacgcaaa ctctttctgt tacgagaacg aagtagctct
+     1201 cacatcaaag gaagaagaag aagattcaga gaacggagtt cccgagtcaa ccagcaccga
+     1261 ctctcctccc ggcattgacc tgcacaacca agccagtgtc cccctggagc ctagacctct
+     1321 tcggagagag agtgaaatct aaaacttgtt tattgcagct tataatggtt aca
+//
